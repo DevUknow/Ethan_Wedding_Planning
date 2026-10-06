@@ -26,14 +26,20 @@ on conflict (email) do update set name=excluded.name;
 
 ## 3. 이메일 인증
 
-Supabase Authentication에서 Email 인증을 켭니다. 이메일 인증 템플릿의 **Magic Link** 내용에 다음 OTP 코드를 포함합니다.
+Supabase Authentication에서 Email 인증을 켭니다. **Authentication → Notifications → Emails → Templates**에서 **Confirm sign up**과 **Magic Link / OTP** 두 템플릿의 본문을 다음과 같이 설정합니다. 첫 접속에서 계정이 생성될 때는 Confirm sign up이 사용되고, 이후 로그인에는 Magic Link / OTP가 사용됩니다. 한쪽만 수정하면 인증 코드 없이 링크만 있는 메일을 받을 수 있습니다.
 
 ```html
 <h2>Our Chapter 관리자 인증</h2>
 <p>이메일 인증 코드: <strong>{{ .Token }}</strong></p>
 ```
 
+템플릿 편집 화면에서 `Set up custom SMTP to edit templates`가 표시되면 사용자 소유 SMTP를 먼저 설정합니다. 2026-06-03 이후 생성된 무료 프로젝트는 기본 발송 서비스 사용 시 템플릿 편집이 제한됩니다. SMTP 비밀번호나 Google 앱 비밀번호는 Supabase 설정에만 입력하고 공개 저장소·브라우저 설정에 넣지 않습니다.
+
+**Authentication → URL Configuration**의 **Site URL**을 `https://devuknow.github.io/Ethan_Wedding_Planning/`로 설정합니다. Redirect URLs에도 같은 주소를 등록합니다. 기본값 `http://localhost:3000`은 배포 사이트 주소로 변경해야 합니다. 이 사이트의 로그인은 이메일에 표시된 코드를 직접 입력하는 방식입니다.
+
 사이트에서 이름·별명·등록된 이메일을 입력하고 메일의 인증 코드를 입력합니다. 실제 저장 권한은 서버가 이메일 인증 결과로 판단합니다. 브라우저의 역할 값을 바꿔도 서버 쓰기 권한을 얻을 수 없습니다.
+
+이미 코드 없는 가입 확인 메일을 받았다면 두 템플릿을 저장한 뒤 사이트에서 **이메일 다시 입력 → 인증 메일 받기**로 새 메일을 요청합니다. 새로 받은 메일의 코드를 사이트에 입력합니다. 발송 간격 제한이 표시되면 지정된 시간 뒤에 다시 요청합니다.
 
 Supabase의 기본 메일 발송 서비스는 프로젝트 팀의 승인된 주소로 발송을 제한할 수 있습니다. 외부 주소로 발송하려면 사용자 소유 SMTP를 설정하거나 해당 이메일을 Supabase 프로젝트 팀에 추가해야 합니다. 발송 제한·이메일 수신·인증 성공을 실제 프로젝트에서 확인하세요.
 
