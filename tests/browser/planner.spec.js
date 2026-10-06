@@ -1,4 +1,11 @@
 import {test,expect} from '@playwright/test';
+test.beforeEach(async({page})=>{
+ await page.goto('/');
+ await page.getByLabel('이름',{exact:true}).fill('송윤오');
+ await page.getByLabel('별명',{exact:true}).fill('예쁜강아지');
+ await page.getByRole('button',{name:'관리자로 들어가기'}).click();
+ await expect(page.getByRole('heading',{name:/설레는 시작/})).toBeVisible();
+});
 test('couple settings, checklist, budget, guests and persistence',async({page})=>{
  await page.goto('/');
  await expect(page.getByRole('heading',{name:/설레는 시작/})).toBeVisible();
