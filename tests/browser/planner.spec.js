@@ -75,3 +75,22 @@ test('backup restore validates records and deletion persists',async({page})=>{
  await page.getByRole('button',{name:'예산 관리',exact:true}).click();
  await expect(page.getByText('복원 지출',{exact:true})).toHaveCount(0);
 });
+
+test('personalized heart branding and legacy data preservation',async({page})=>{
+ await page.goto('/');
+ await expect(page).toHaveTitle('송윤오 ♥ 박예은 · Our Chapter');
+ await expect(page.locator('.hero-couple')).toHaveText('송윤오 ♥ 박예은');
+ await expect(page.locator('.brand-icon')).toBeVisible();
+ expect(await page.locator('.brand-icon').evaluate(img=>img.complete&&img.naturalWidth>0)).toBe(true);
+ const favicon=page.locator('link[rel="icon"]');
+ expect((await page.request.get(await favicon.getAttribute('href'))).status()).toBe(200);
+ await page.screenshot({path:'/tmp/our-chapter-olive-desktop.png',fullPage:true,animations:'disabled'});
+ await page.setViewportSize({width:390,height:844});
+ await page.screenshot({path:'/tmp/our-chapter-olive-mobile.png',fullPage:true,animations:'disabled'});
+ await page.evaluate(()=>localStorage.setItem('our-chapter-v1',JSON.stringify({couple:'Ethan & You',date:'2027-03-21',budget:12000000,tasks:[{id:'keep',title:'보존할 준비',category:'장소',due:'',done:true}],expenses:[{id:'expense',title:'보존할 지출',category:'기타',amount:10000}],guests:[{id:'guest',name:'친구',side:'함께',status:'참석'}],saved:['garden']})));
+ await page.reload();
+ await expect(page.locator('.hero-couple')).toHaveText('송윤오 ♥ 박예은');
+ await expect(page.getByText('10,000원',{exact:true})).toBeVisible();
+ await expect(page.getByText('1개 중 1개 완료',{exact:true})).toBeVisible();
+ await expect(page.getByText('참석 확정 1명',{exact:true})).toBeVisible();
+});
