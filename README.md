@@ -43,3 +43,13 @@ npx playwright test
 ```sh
 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npx playwright test
 ```
+
+## GitHub Pages 배포
+
+현재 설정: **Settings → Pages → Deploy from a branch → main / (root)**.
+
+`app/`에 개발 소스가 있고, 저장소 루트의 `index.html`, `assets/`, `.nojekyll`은 Pages용 빌드 결과입니다. `npm run build`는 Vite로 빌드한 뒤 루트 게시 파일을 갱신합니다. 기능을 수정할 때 소스와 갱신된 게시 파일을 함께 커밋·푸시하세요. 이전 빌드의 에셋은 `.pages-manifest.json`에 기록된 파일만 정리합니다.
+
+예상 주소: https://devuknow.github.io/Ethan_Wedding_Planning/
+
+상대 에셋 경로를 사용해 저장소 하위 경로에서도 JavaScript와 CSS가 로드됩니다. `.github/workflows/ci.yml`은 테스트와 빌드 후 커밋된 게시 파일이 최신인지 검사합니다. 실제 게시 작업은 기존 GitHub Pages 브랜치 설정에서 수행됩니다.
