@@ -3,3 +3,5 @@ dist/
 .playwright/
 test-results/
 *.log
+.env.local
+.env.*.local
