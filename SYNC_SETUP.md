@@ -1,12 +1,14 @@
 # 실제 동기화 연결
 
-현재 연결값은 비어 있습니다. 프로젝트 연결 전에는 기존 브라우저 저장 방식으로 동작합니다. 연결 준비와 로컬 테스트 완료만으로 실제 Supabase 동기화가 완료된 것은 아닙니다.
+공개 연결 설정은 `https://sxbhdoukjljqzdzfrsms.supabase.co` 프로젝트에 맞춰 `app/cloud-config.json`에 반영했습니다. URL 뒤의 `/rest/v1/`은 SDK가 붙이므로 설정에는 프로젝트 기본 주소만 사용합니다. 실제 사용 전에는 아래 SQL과 이메일 인증 설정이 필요합니다. 빌드·로컬 검사만으로 실제 Supabase 동기화가 완료된 것은 아닙니다.
 
 ## 1. Supabase 프로젝트 준비
 
 [Supabase Dashboard](https://supabase.com/dashboard)에서 새 프로젝트를 만들거나 기존 프로젝트를 선택합니다. Project URL과 **publishable key**를 확인합니다. 공개 연결 키는 브라우저에서 사용하는 키입니다. `secret` 또는 `service_role` 키는 이 사이트에 넣지 않습니다.
 
-클라우드 환경 설정의 `VITE_SUPABASE_URL`과 `VITE_SUPABASE_PUBLISHABLE_KEY`에 값을 입력합니다. GitHub Pages 빌드가 이후에도 같은 연결을 재현하도록 연결 완료 시 공개 설정을 `app/cloud-config.json`에 반영해야 합니다. 이 파일의 내용은 공개되므로 공개 연결 값만 기록합니다. 관리자 이메일은 여기에 넣지 않습니다.
+현재 공개 설정은 저장소에 포함되어 GitHub Pages의 후속 빌드에서도 같은 연결을 재현합니다. 다른 프로젝트를 개발용으로 사용할 때는 클라우드 환경 설정의 `VITE_SUPABASE_URL`과 `VITE_SUPABASE_PUBLISHABLE_KEY`로 덮어쓸 수 있습니다. 설정 파일의 내용은 공개되므로 공개 연결 값만 기록합니다. 관리자 이메일은 여기에 넣지 않습니다.
+
+클라우드 개발 환경의 네트워크 허용 목록에는 `sxbhdoukjljqzdzfrsms.supabase.co`가 필요합니다. 설정 초안 저장만으로 현재 환경에 적용되지는 않습니다. 환경 설정을 저장·게시한 뒤 접속을 다시 확인합니다. 이 제한은 개발 환경의 접속 정책이며 방문자 브라우저의 접속 정책과는 별개입니다.
 
 ## 2. 데이터베이스와 권한
 

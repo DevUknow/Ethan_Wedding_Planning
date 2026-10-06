@@ -34,9 +34,10 @@ npm run preview
 ## 브라우저 검증
 ```sh
 npx playwright install chromium
-npm run dev
 npx playwright test
 ```
+
+브라우저 검사는 별도 테스트 서버와 빈 연결 설정을 사용해 기존 브라우저 저장 기능을 검사합니다. 운영 Supabase에 기록하거나 인증 메일을 보내지 않습니다. 테스트 서버는 자동으로 시작되므로 `npx playwright test` 실행 전에 개발 서버를 띄울 필요가 없습니다.
 
 클라우드 환경에 설치된 Chromium을 사용할 때는 다음 명령을 실행하세요.
 
@@ -66,4 +67,4 @@ PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npx playwright test
 
 Supabase 연결 시 이메일 인증을 거친 관리자만 서버에 저장하고, 게스트는 공유 기록을 읽기 전용으로 봅니다. 변경 사항은 실시간 구독으로 다른 기기에 반영하며 revision 비교로 동시 수정 충돌을 처리합니다.
 
-**현재는 Project URL과 공개 연결 키가 아직 입력되지 않아 실제 동기화가 활성화되지 않았습니다.** 연결 절차와 권한 SQL은 [SYNC_SETUP.md](SYNC_SETUP.md)에 설명합니다. 사용자 요청에 따라 송윤오의 이메일만 첫 관리자 등록 대상으로 준비했습니다. 실제 이메일은 공개 저장소에 기록하지 않습니다.
+`app/cloud-config.json`에 Project URL과 공개 publishable 키를 설정했습니다. 이 설정으로 빌드한 사이트는 Supabase 공유 저장소를 사용합니다. **테이블·서버 권한 설정과 실제 이메일 인증·저장 검증은 별도로 필요합니다.** 연결 절차와 권한 SQL은 [SYNC_SETUP.md](SYNC_SETUP.md)에 설명합니다. 사용자 요청에 따라 송윤오의 이메일만 첫 관리자 등록 대상으로 준비했습니다. 실제 이메일은 공개 저장소에 기록하지 않습니다. 서버 기록을 읽을 수 없으면 연결 오류를 표시하고 저장을 진행하지 않습니다.
