@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
 import {initialData} from '../app/src/model.js';
+import {saveExpense,savePayment} from '../app/src/budget-model.js';
 
 test('PostgreSQL restricts writes to verified approved emails and handles revisions',async()=>{
  const db=new PGlite();
@@ -31,6 +32,10 @@ test('PostgreSQL restricts writes to verified approved emails and handles revisi
   const data={...initialData,budget:15000000};
   const saved=await db.query('select * from public.save_wedding_state($1,$2::jsonb)',[0,JSON.stringify(data)]);
   assert.equal(saved.rows[0].revision,1);assert.equal(saved.rows[0].data.budget,15000000);
+  let tactical=saveExpense(data,null,{title:'본식 스냅',category:'본식 사진·영상',vendor:'테스트 업체',plannedAmount:1000,actualAmount:1200,priority:'필수',dueDate:'2027-05-20',notes:'부가세 포함'},'budget-contract');
+  tactical=savePayment(tactical,'budget-contract',{id:'deposit',title:'계약금',amount:200,date:'2026-10-13',method:'계좌이체',payer:'공동'});
+  const detailed=await db.query('select * from public.save_wedding_state($1,$2::jsonb)',[1,JSON.stringify(tactical)]);
+  assert.equal(detailed.rows[0].revision,2);assert.deepEqual(detailed.rows[0].data.expenses,tactical.expenses);
   assert.equal((await db.query('select * from public.save_wedding_state($1,$2::jsonb)',[0,JSON.stringify(initialData)])).rows.length,0);
   await assert.rejects(db.query('select * from public.save_wedding_state($1,$2::jsonb)',[1,JSON.stringify({...data,budget:0})]),/Invalid/);
   await db.exec('reset role;');await db.exec(sql);

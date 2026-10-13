@@ -45,8 +45,9 @@ test('guest can browse every page but cannot modify existing records',async({pag
  expect(JSON.parse(await page.evaluate(()=>localStorage.getItem('our-chapter-v1'))).tasks[0].done).toBe(false);
  await page.getByRole('button',{name:'예산 관리',exact:true}).click();
  await expect(page.getByText('읽기 전용 지출',{exact:true})).toBeVisible();
- await expect(page.getByRole('button',{name:'지출 추가'})).toHaveCount(0);
- await expect(page.getByRole('button',{name:'읽기 전용 지출 삭제'})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'예산 항목 추가'})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'읽기 전용 지출 항목 수정'})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'읽기 전용 지출 항목 삭제'})).toHaveCount(0);
  await page.getByRole('button',{name:'하객 관리',exact:true}).click();
  await expect(page.getByText('우리 친구',{exact:true})).toBeVisible();
  await expect(page.locator('select')).toHaveCount(0);

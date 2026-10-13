@@ -68,6 +68,13 @@ try{
  await a.getByRole('button',{name:'하객 관리',exact:true}).click();await a.getByRole('button',{name:'하객 추가'}).click();await a.getByLabel('이름',{exact:true}).fill('동기화 친구');await a.getByRole('button',{name:'저장하기'}).click();
  await g.getByRole('button',{name:'하객 관리',exact:true}).click();await expect(g.getByText('동기화 친구',{exact:true})).toBeVisible();
  await a.getByLabel('동기화 친구 참석 여부').selectOption('참석');await expect(g.getByText('참석',{exact:true})).toBeVisible();assert.equal(row.data.guests[0].status,'참석');
+ await a.getByRole('button',{name:'예산 관리',exact:true}).click();await g.getByRole('button',{name:'예산 관리',exact:true}).click();
+ await a.getByRole('button',{name:'예산 항목 추가'}).click();await a.getByLabel('예산 항목',{exact:true}).fill('동기화 웨딩홀');await a.getByLabel('계획 금액 (원)',{exact:true}).fill('1000000');await a.getByLabel('계약·확정 금액 (원)').fill('1200000');await a.getByRole('button',{name:'예산 항목 저장'}).click();
+ await expect(g.getByRole('button',{name:'동기화 웨딩홀',exact:true})).toBeVisible();
+ await a.getByRole('button',{name:'동기화 웨딩홀 결제 기록 추가'}).click();await a.getByLabel('결제 금액 (원)').fill('200000');await a.getByRole('button',{name:'결제 기록 저장'}).click();
+ await expect(g.locator('.budget-summary-grid article').nth(2)).toContainText('200,000');await expect(g.locator('.budget-summary-grid article').nth(3)).toContainText('1,000,000');
+ await a.getByRole('button',{name:'동기화 웨딩홀 항목 수정'}).click();await a.getByLabel('계약·확정 금액 (원)').fill('1500000');await a.getByRole('button',{name:'예산 항목 저장'}).click();
+ await expect(g.locator('.budget-summary-grid article').nth(3)).toContainText('1,300,000');assert.equal(row.data.expenses[0].payments[0].amount,200000);assert.equal(row.data.expenses[0].actualAmount,1500000);await expect(g.getByRole('button',{name:/항목 수정|결제 기록 추가/})).toHaveCount(0);
  await a.reload();await expect(a.locator('.role-badge')).toHaveText('송윤오 · 관리자');assert.equal(row.data.tasks[0].done,true);assert.deepEqual(errors,[]);
- console.log('Mock cloud browser passed: email flow, two-device realtime, shared persistence, guest write guard. Live Supabase validation still required.');
+ console.log('Mock cloud browser passed: email flow, two-device realtime, detailed budgets, contract edits, payment balances, shared persistence and guest write guard. Live Supabase read-only validation still required.');
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve))}
