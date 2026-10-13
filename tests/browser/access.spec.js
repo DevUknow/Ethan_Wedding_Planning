@@ -55,10 +55,10 @@ test('guest can browse every page but cannot modify existing records',async({pag
  await expect(page.getByText('2027-01-21',{exact:true})).toBeVisible();
  await expect(page.getByRole('button',{name:'일정 추가'})).toHaveCount(0);
  await expect(page.getByRole('button',{name:'날짜 설정'})).toHaveCount(0);
- await page.getByRole('button',{name:'웨딩 영감',exact:true}).click();
- for(const heart of await page.locator('.save-heart').all())await expect(heart).toBeDisabled();
- await page.getByRole('button',{name:'저장한 영감'}).click();
- await expect(page.locator('.idea-card')).toHaveCount(1);
+ await page.getByRole('button',{name:'웨딩홀 소개',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'브리에홀 Briller Hall'})).toBeVisible();
+ await expect(page.getByRole('button',{name:'주소 복사'})).toBeEnabled();
+ await expect(page.getByRole('link',{name:/네이버 지도/})).toBeVisible();
  await page.reload();
  await expect(page.locator('.role-badge')).toHaveText('게스트 · 읽기 전용');
  expect(JSON.parse(await page.evaluate(()=>localStorage.getItem('our-chapter-v1')))).toEqual(data);
