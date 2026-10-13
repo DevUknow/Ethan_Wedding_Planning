@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {initialData} from '../app/src/model.js';
 import {createSynchronizer} from '../app/src/sync-core.js';
+import {saveExpense,savePayment,expenseTotals} from '../app/src/budget-model.js';
 
 function sharedBackend(){
  let row={revision:0,data:structuredClone(initialData)},failNext=false;const listeners=new Set();
@@ -24,4 +25,13 @@ test('failed writes preserve data and later writes remain possible',async()=>{
  assert.equal(data.budget,initialData.budget);
  await sync.change(old=>({...old,budget:400}));assert.equal(data.budget,400);
  await assert.rejects(sync.change(old=>({...old,budget:-1})),/형식/);assert.equal(data.budget,400);assert.equal(errors.length,2);sync.stop();
+});
+test('simultaneous deposits on one contract preserve both payments',async()=>{
+ const backend=sharedBackend();let first,second;
+ const a=createSynchronizer(backend,{onData:data=>first=data,onStatus(){},onError(){}}),b=createSynchronizer(backend,{onData:data=>second=data,onStatus(){},onError(){}});
+ await Promise.all([a.start(),b.start()]);
+ await a.change(data=>saveExpense(data,null,{title:'본식 스냅',category:'본식 사진·영상',vendor:'',plannedAmount:1000,actualAmount:1000,priority:'필수',dueDate:'',notes:''},'contract'));
+ const payment={title:'중도금',date:'2026-10-13',method:'계좌이체',payer:'공동'};
+ await Promise.all([a.change(data=>savePayment(data,'contract',{...payment,id:'payment-a',amount:200})),b.change(data=>savePayment(data,'contract',{...payment,id:'payment-b',amount:300}))]);
+ assert.equal(first.expenses[0].payments.length,2);assert.equal(expenseTotals(first.expenses[0]).paid,500);assert.equal(expenseTotals(first.expenses[0]).outstanding,500);assert.deepEqual(first,second);a.stop();b.stop();
 });

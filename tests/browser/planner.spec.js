@@ -23,12 +23,13 @@ test('couple settings, checklist, budget, guests and persistence',async({page})=
  await page.getByRole('button',{name:'완료',exact:true}).click();
  await expect(page.getByText('테스트 웨딩홀 예약',{exact:true})).toBeVisible();
  await page.getByRole('button',{name:'예산 관리',exact:true}).click();
- await page.getByRole('button',{name:'지출 추가'}).click();
- await page.getByLabel('지출 항목').fill('웨딩홀 계약금');
- await page.getByLabel('금액 (원)').fill('25000000');
- await page.getByRole('button',{name:'저장하기'}).click();
+ await page.getByRole('button',{name:'예산 항목 추가'}).click();
+ await page.getByLabel('예산 항목',{exact:true}).fill('웨딩홀 계약금');
+ await page.getByLabel('계획 금액 (원)',{exact:true}).fill('20000000');
+ await page.getByLabel('계약·확정 금액 (원)').fill('25000000');
+ await page.getByRole('button',{name:'예산 항목 저장'}).click();
  await expect(page.getByText('예산 초과',{exact:true})).toBeVisible();
- await expect(page.getByRole('heading',{name:'5,000,000원',exact:true})).toBeVisible();
+ await expect(page.locator('.budget-balance')).toContainText('5,000,000원');
  await page.getByRole('button',{name:'하객 관리',exact:true}).click();
  await page.getByRole('button',{name:'하객 추가'}).click();
  await page.getByLabel('이름',{exact:true}).fill('김친구');
@@ -77,7 +78,8 @@ test('backup restore validates records and deletion persists',async({page})=>{
  await expect(page.getByRole('status')).toContainText('복원했습니다');
  await page.getByRole('button',{name:'예산 관리',exact:true}).click();
  await expect(page.getByText('복원 지출',{exact:true})).toBeVisible();
- await page.getByRole('button',{name:'복원 지출 삭제'}).click();
+ page.once('dialog',d=>d.accept());
+ await page.getByRole('button',{name:'복원 지출 항목 삭제'}).click();
  await page.reload();
  await page.getByRole('button',{name:'예산 관리',exact:true}).click();
  await expect(page.getByText('복원 지출',{exact:true})).toHaveCount(0);
