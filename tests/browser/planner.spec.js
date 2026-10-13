@@ -40,10 +40,10 @@ test('couple settings, checklist, budget, guests and persistence',async({page})=
  await page.getByRole('button',{name:'우리의 일정',exact:true}).click();
  await expect(page.getByText('2027-01-20',{exact:true})).toBeVisible();
  await expect(page.getByText('2027-05-22',{exact:true})).toBeVisible();
- await page.getByRole('button',{name:'웨딩 영감',exact:true}).click();
- await page.getByRole('button',{name:'가든 웨딩 저장',exact:true}).click();
- await page.getByRole('button',{name:'저장한 영감'}).click();
- await expect(page.locator('.idea-card')).toHaveCount(1);
+ await expect(page.locator('.wedding-venue')).toHaveText('더파티움 안양 · 5층 브리에홀');
+ await page.getByRole('button',{name:'웨딩홀 소개',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'브리에홀 Briller Hall'})).toBeVisible();
+ await expect(page.getByRole('link',{name:/공식 홀 소개/})).toHaveAttribute('href','https://www.thepartyumanyang.com/Briller');
  const downloadPromise=page.waitForEvent('download');
  await page.getByRole('button',{name:'백업',exact:true}).click();
  expect((await downloadPromise).suggestedFilename()).toBe('our-chapter-backup.json');

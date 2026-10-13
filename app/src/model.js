@@ -1,11 +1,13 @@
 export const initialData = {
   couple: '송윤오 ♥ 박예은', date: '', budget: 30000000,
   tasks: [
-    {id:'t1',title:'우리에게 어울리는 웨딩홀 찾아보기',category:'장소',due:'',done:false},
+    {id:'t1',title:'브리에홀 본식 동선과 준비 사항 확인하기',category:'장소',due:'',done:false},
     {id:'t2',title:'결혼식 전체 예산 함께 정하기',category:'예산',due:'',done:false},
     {id:'t3',title:'웨딩 촬영 무드보드 만들기',category:'스튜디오',due:'',done:false},
     {id:'t4',title:'초대하고 싶은 사람들 적어보기',category:'하객',due:'',done:false}
-  ], expenses: [], guests: [], saved: []
+  ], expenses: [], guests: [],
+  // Retain legacy favorites for existing backups and shared-state compatibility.
+  saved: []
 };
 export function daysUntil(date, today = new Date()) {
   if (!date) return null;
