@@ -159,6 +159,19 @@ try{
   assert.equal(linked.vendor,'동기화 가구점');assert.equal(linked.dueDate,'2027-04-08');assert.equal(linked.notes,'배송료 포함');
   assert.deepEqual(linked.payments,homePayments);assert.deepEqual(row.data.expenses[0].payments,weddingPayments);
  }
+ await a.getByRole('button',{name:'공간 관리',exact:true}).click();
+ await a.getByLabel('새 공간 이름',{exact:true}).fill('드레스룸');await a.getByRole('button',{name:'공간 추가',exact:true}).click();
+ await expect(g.locator('.home-room-tabs').getByRole('button',{name:'드레스룸 0',exact:true})).toBeVisible();
+ await a.getByRole('button',{name:'드레스룸 이름 변경',exact:true}).click();await a.getByLabel('공간 이름',{exact:true}).fill('수납방');await a.getByRole('button',{name:'공간 이름 저장',exact:true}).click();
+ await expect(g.locator('.home-room-tabs').getByRole('button',{name:'수납방 0',exact:true})).toBeVisible();
+ await expect(g.locator('.home-room-tabs').getByRole('button',{name:'드레스룸 0',exact:true})).toHaveCount(0);
+ await a.getByRole('button',{name:'주방·다이닝 이름 변경',exact:true}).click();await a.getByLabel('공간 이름',{exact:true}).fill('다이닝룸');await a.getByRole('button',{name:'공간 이름 저장',exact:true}).click();
+ await expect(guestHomeCard).toContainText('다이닝룸 · 가구');
+ await expect(g.getByRole('button',{name:'공간 관리',exact:true})).toHaveCount(0);
+ const roomRenamedExpense=row.data.expenses.find(item=>item.id===homeExpenseId);
+ assert.equal(roomRenamedExpense.title,`다이닝룸 · ${homeName}`);assert.equal(roomRenamedExpense.actualAmount,1000000);
+ assert.deepEqual(roomRenamedExpense.payments,homePayments);assert.deepEqual(row.data.expenses[0].payments,weddingPayments);
+ await a.getByRole('dialog').getByRole('button',{name:'닫기',exact:true}).click();
  const persistedHome=structuredClone(row.data.home);
  for(const page of [a,g])await page.reload();
  await expect(a.locator('.role-badge')).toHaveText('송윤오 · 관리자');

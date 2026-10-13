@@ -1,6 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {Plus, Pencil, Trash2, X, Check, Search, Sofa, Lamp, Refrigerator, Package, House, ListChecks, Wallet, ArrowUpRight, Link2, CalendarDays, Ruler, Heart, Leaf} from 'lucide-react';
-import {homeRooms, homeCategories, homeStatuses, homeTemplate, getHome, homeItemTotals, homeSummary, saveHomeItem, setHomeBudget, deleteHomeItem, addHomeTemplateItems, linkHomeItemToBudget} from './home-model.js';
+import {homeCategories, homeStatuses, getHome, getHomeRooms, getHomeTemplate, homeItemTotals, homeSummary, saveHomeItem, setHomeBudget, deleteHomeItem, addHomeTemplateItems, linkHomeItemToBudget, addHomeRoom, renameHomeRoom} from './home-model.js';
 import {localToday, money} from './budget-model.js';
 import './home.css';
 
@@ -19,9 +19,9 @@ function HomeDialog({title, onClose, children}) {
   return <dialog ref={ref} className="home-dialog" aria-labelledby="home-dialog-title" onCancel={event => {event.preventDefault();onClose()}}><div className="home-dialog-heading"><h2 id="home-dialog-title">{title}</h2><button className="icon-button" aria-label="닫기" onClick={onClose}><X size={21}/></button></div>{children}</dialog>;
 }
 
-function HomeItemEditor({item, existingId, onSave, onClose}) {
+function HomeItemEditor({item, existingId, rooms, initialRoom, onSave, onClose}) {
   const [values,setValues] = useState(() => {
-    const initial = item || blankItem;
+    const initial = item || {...blankItem,room:initialRoom || rooms[0] || blankItem.room};
     return {...initial,...Object.fromEntries(['quantity','plannedUnit','actualUnit','width','depth','height'].map(key => [key,initial[key] === null ? '' : String(initial[key])]))};
   });
   const [error,setError] = useState(''),[pending,setPending] = useState(false);
@@ -37,8 +37,8 @@ function HomeItemEditor({item, existingId, onSave, onClose}) {
   const planned = Number(values.quantity || 0)*Number(values.plannedUnit || 0);
   return <form className="home-form" onSubmit={submit}>
     <p className="home-form-intro">마음에 드는 제품부터 치수·예산·설치 일정까지, 필요한 정보를 함께 기록하세요.</p>
-    <label>품목명<input autoFocus required maxLength={100} value={values.name} onChange={e => field('name',e.target.value)} placeholder="예: 거실 3인 소파, 침실 커튼"/></label>
-    <div className="home-form-grid"><label>방·공간<input list="home-room-options" required maxLength={40} value={values.room} onChange={e => field('room',e.target.value)} placeholder="공간을 직접 입력해도 좋아요"/><datalist id="home-room-options">{homeRooms.map(room => <option key={room} value={room}/>)}</datalist></label><label>분류<select value={values.category} onChange={e => field('category',e.target.value)}>{homeCategories.map(category => <option key={category}>{category}</option>)}</select></label></div>
+    <label>품목명<input autoFocus required maxLength={100} value={values.name} onChange={e => field('name',e.target.value)} placeholder="예: 거실 3인 소파, 안방 커튼"/></label>
+    <div className="home-form-grid"><label>방·공간<input list="home-room-options" required maxLength={40} value={values.room} onChange={e => field('room',e.target.value)} placeholder="공간을 직접 입력해도 좋아요"/><datalist id="home-room-options">{rooms.map(room => <option key={room} value={room}/>)}</datalist></label><label>분류<select value={values.category} onChange={e => field('category',e.target.value)}>{homeCategories.map(category => <option key={category}>{category}</option>)}</select></label></div>
     <div className="home-form-grid"><label>우선순위<select value={values.priority} onChange={e => field('priority',e.target.value)}><option>필수</option><option>선택</option></select></label><label>준비 상태<select value={values.status} onChange={e => field('status',e.target.value)}>{homeStatuses.map(status => <option key={status}>{status}</option>)}</select></label></div>
     <fieldset><legend><Wallet size={15}/> 구매 계획</legend><div className="home-form-grid"><label>계획 단가 (원)<input type="number" min="0" max="1000000000000" step="1" required value={values.plannedUnit} onChange={e => field('plannedUnit',e.target.value)}/></label><label>실구매 단가 (원)<input type="number" min="0" max="1000000000000" step="1" value={values.actualUnit} onChange={e => field('actualUnit',e.target.value)} placeholder="확정 전에는 비워두세요"/></label></div><label>수량<input type="number" min="1" max="1000" step="1" required value={values.quantity} onChange={e => field('quantity',e.target.value)}/></label><p className="home-calculated">계획 합계 <strong>{Number.isFinite(planned) ? money(planned) : '—'}원</strong><span>단가 × 수량으로 계산됩니다.</span></p></fieldset>
     <fieldset><legend><Ruler size={15}/> 공간에 맞추기</legend><div className="home-form-grid home-dimensions"><label>가로 (cm)<input type="number" min="0.1" max="100000" step="0.1" value={values.width} onChange={e => field('width',e.target.value)} placeholder="선택"/></label><label>깊이 (cm)<input type="number" min="0.1" max="100000" step="0.1" value={values.depth} onChange={e => field('depth',e.target.value)} placeholder="선택"/></label><label>높이 (cm)<input type="number" min="0.1" max="100000" step="0.1" value={values.height} onChange={e => field('height',e.target.value)} placeholder="선택"/></label></div><div className="home-form-grid"><label>색상<input maxLength={80} value={values.color} onChange={e => field('color',e.target.value)} placeholder="예: 아이보리"/></label><label>소재<input maxLength={100} value={values.material} onChange={e => field('material',e.target.value)} placeholder="예: 패브릭, 원목"/></label></div><label>배치 위치<input maxLength={200} value={values.placement} onChange={e => field('placement',e.target.value)} placeholder="예: 거실 창가 오른쪽 벽"/></label></fieldset>
@@ -61,9 +61,41 @@ function HomeBudgetEditor({budget,onSave,onClose}) {
   return <form className="home-form" onSubmit={submit}><p className="home-form-intro">신혼집 가구·가전·소품을 위한 별도 한도를 정하세요. 결혼 총 예산은 예산 관리에서 따로 설정합니다.</p><label>꾸미기 예산 (원)<input autoFocus type="number" min="0" max="1000000000000" step="1" value={amount} onChange={e => {setAmount(e.target.value);setError('')}} placeholder="예: 10000000"/></label><p className="home-form-intro">0원 또는 빈칸으로 저장하면 한도를 미설정으로 표시합니다.</p>{error ? <p className="home-error" role="alert">{error}</p> : null}<div className="modal-actions"><button type="button" className="outline-button" disabled={pending} onClick={onClose}>취소</button><button className="primary-button" disabled={pending}>{pending ? '저장 중…' : '꾸미기 예산 저장'} <Check size={16}/></button></div></form>;
 }
 
-function HomeTemplatePicker({items,onSave,onClose}) {
-  const existing = new Set(items.map(item => `${item.room}\0${item.name}`));
-  const available = homeTemplate.filter(item => !existing.has(`${item.room}\0${item.name}`));
+function HomeRoomManager({data,onSave,onRename}) {
+  const rooms = getHomeRooms(data),items = getHome(data).items;
+  const [newName,setNewName] = useState(''),[editing,setEditing] = useState(null),[error,setError] = useState(''),[pending,setPending] = useState('');
+  useEffect(() => {
+    if (editing && !rooms.includes(editing.room)) setEditing(null);
+  }, [rooms,editing]);
+  async function addRoom(event) {
+    event.preventDefault();setPending('add');setError('');
+    try {
+      if (await onSave(current => addHomeRoom(current,newName))) setNewName('');
+      else setError('공간을 추가하지 못했습니다. 연결 상태를 확인해 주세요.');
+    } catch(error) {setError(error.message)} finally {setPending('')}
+  }
+  async function renameRoom(event) {
+    event.preventDefault();setPending('rename');setError('');
+    const previousName = editing.room,nextName = editing.name.trim();
+    try {
+      if (await onSave(current => renameHomeRoom(current,previousName,nextName))) {
+        setEditing(null);onRename(previousName,nextName);
+      } else setError('공간 이름을 저장하지 못했습니다. 연결 상태를 확인해 주세요.');
+    } catch(error) {setError(error.message)} finally {setPending('')}
+  }
+  return <div className="home-room-manager">
+    <p className="home-form-intro">품목이 없어도 공간을 미리 추가할 수 있어요. 공간 이름을 바꾸면 등록된 품목도 함께 옮겨집니다.</p>
+    <form className="home-form home-room-add" onSubmit={addRoom}><label>새 공간 이름<input autoFocus maxLength={40} value={newName} disabled={!!pending} onChange={event => {setNewName(event.target.value);setError('')}} placeholder="예: 드레스룸, 취미방"/></label><button className="primary-button" disabled={!!pending}>{pending === 'add' ? '추가 중…' : '공간 추가'} <Plus size={15}/></button></form>
+    {error ? <p className="home-error" role="alert">{error}</p> : null}
+    <ul className="home-space-list" aria-label="등록된 공간">{rooms.map(room => <li key={room}>{editing?.room === room ? <form className="home-form home-room-rename" onSubmit={renameRoom}><label>공간 이름<input autoFocus maxLength={40} value={editing.name} disabled={!!pending} onChange={event => {setEditing(current => ({...current,name:event.target.value}));setError('')}}/></label><div><button type="button" className="text-button" disabled={!!pending} onClick={() => {setEditing(null);setError('')}}>취소</button><button className="outline-button" disabled={!!pending}>{pending === 'rename' ? '저장 중…' : '공간 이름 저장'} <Check size={14}/></button></div></form> : <><div><strong>{room}</strong><span>{items.filter(item => item.room === room).length}개 품목</span></div><button className="outline-button" aria-label={`${room} 이름 변경`} disabled={!!pending} onClick={() => {setEditing({room,name:room});setError('')}}><Pencil size={13}/> 이름 변경</button></>}</li>)}</ul>
+  </div>;
+}
+
+function HomeTemplatePicker({data,onSave,onClose}) {
+  const items = getHome(data).items;
+  const existing = new Set(items.map(item => `${item.room.trim()}\0${item.name.trim()}`));
+  const existingKeys = new Set(items.map(item => item.templateKey).filter(key => key !== undefined));
+  const available = getHomeTemplate(data).filter(item => !existingKeys.has(item.key) && !existing.has(`${item.room}\0${item.name}`));
   const [selected,setSelected] = useState([]),[error,setError] = useState(''),[pending,setPending] = useState(false);
   async function submit(event) {
     event.preventDefault();setPending(true);setError('');
@@ -104,7 +136,8 @@ export default function HomePlanner({data,canEdit,onChange,onOpenBudget}) {
   const [room,setRoom] = useState(''),[search,setSearch] = useState(''),[category,setCategory] = useState(''),[status,setStatus] = useState(''),[sort,setSort] = useState('등록순');
   const [dialog,setDialog] = useState(null),[error,setError] = useState(''),[busyId,setBusyId] = useState('');
   const home = getHome(data),summary = homeSummary(data);
-  const rooms = [...new Set([...homeRooms,...home.items.map(item => item.room)])];
+  const rooms = getHomeRooms(data);
+  useEffect(() => {if (room && !rooms.includes(room)) setRoom('')}, [room,rooms]);
   const selectedItem = dialog?.itemId ? home.items.find(item => item.id === dialog.itemId) : null;
   const filtered = home.items.filter(item => (!room || item.room === room) && (!category || item.category === category) && (!status || item.status === status) && `${item.name} ${item.room} ${item.color} ${item.material} ${item.placement} ${item.notes}`.toLowerCase().includes(search.trim().toLowerCase())).sort((a,b) => sort === '금액 큰순' ? homeItemTotals(b).projected-homeItemTotals(a).projected : sort === '예정일 빠른순' ? (a.deliveryDate || '9999').localeCompare(b.deliveryDate || '9999') : sort === '필수 먼저' ? Number(a.priority !== '필수')-Number(b.priority !== '필수') : 0);
   const installedPercent = summary.count ? Math.round(summary.installed/summary.count*100) : 0;
@@ -136,13 +169,13 @@ export default function HomePlanner({data,canEdit,onChange,onOpenBudget}) {
     <section className="home-intro"><div className="home-intro-copy"><span className="eyebrow">A PLACE TO CALL OURS</span><h2>취향을 모아,<br/>우리다운 집을 만들어요.</h2><p>방마다 필요한 것, 마음에 드는 제품, 들어갈 자리까지.<br className="home-desktop-break"/> 하나씩 정리하며 함께 살 공간을 채워가요.</p><span className="home-intro-note"><House size={14}/> 우리의 첫 집, 우리의 작은 계획</span></div>{roomArt}</section>
     <section className="home-summary" aria-label="신혼집 꾸미기 현황"><article><span>꾸미기 예산 <Wallet size={16}/></span><h3>{summary.budget ? <>{money(summary.budget)}<small>원</small></> : <span className="home-summary-unset">한도 미설정</span>}</h3>{canEdit ? <button className="text-button" aria-label="꾸미기 예산 설정" onClick={() => setDialog({kind:'budget'})}>{summary.budget ? '예산 변경' : '예산 정하기'} <Pencil size={12}/></button> : <p>신혼집을 위한 별도 예산</p>}</article><article><span>예상 총비용</span><h3>{money(summary.projected)}<small>원</small></h3><p>실구매액 + 미확정 품목의 계획액</p></article><article><span>실구매 확정</span><h3>{money(summary.confirmed)}<small>원</small></h3><p>금액이 확정된 품목의 합계</p></article><article><span>우리 집 완성도 <House size={16}/></span><h3>{installedPercent}<small>%</small></h3><p>{summary.count}개 품목 중 {summary.installed}개 설치 완료</p></article></section>
     <section className={`home-budget-strip ${summary.budget && summary.available < 0 ? 'over' : ''}`} aria-label="꾸미기 예산 배정"><div><strong>{summary.budget ? `${summary.available < 0 ? '예산 초과' : '예산 여유'} ${money(Math.abs(summary.available))}원` : '우리 집을 위한 예산을 정해보세요'}</strong><span>계획 합계 {money(summary.planned)}원 · 주문·배송·설치 {summary.ordered}개</span></div>{summary.budget ? <div className="home-budget-progress"><div><i style={{width:`${Math.min(100,budgetRatio)}%`}}/></div><span>예상 비용 {budgetRatio}%</span></div> : null}</section>
-    <section className="home-board"><div className="home-board-heading"><div><span className="eyebrow">ROOMS & PIECES</span><h2>공간별 꾸미기 목록 <span>{home.items.length}</span></h2><p>구매 전 실측부터 배송·설치까지 함께 체크해요.</p></div>{canEdit ? <div className="home-toolbar"><button className="outline-button" onClick={() => setDialog({kind:'template'})}><ListChecks size={15}/> 기본 품목 불러오기</button><button className="primary-button" onClick={() => setDialog({kind:'item',itemId:null})}><Plus size={16}/> 꾸미기 항목 추가</button></div> : null}</div>
+    <section className="home-board"><div className="home-board-heading"><div><span className="eyebrow">ROOMS & PIECES</span><h2>공간별 꾸미기 목록 <span>{home.items.length}</span></h2><p>구매 전 실측부터 배송·설치까지 함께 체크해요.</p></div>{canEdit ? <div className="home-toolbar"><button className="outline-button home-manage-rooms" onClick={() => setDialog({kind:'rooms'})}><House size={15}/> 공간 관리</button><button className="outline-button" onClick={() => setDialog({kind:'template'})}><ListChecks size={15}/> 기본 품목 불러오기</button><button className="primary-button" onClick={() => setDialog({kind:'item',itemId:null})}><Plus size={16}/> 꾸미기 항목 추가</button></div> : null}</div>
       <div className="home-room-tabs" role="group" aria-label="방·공간 필터">{['',...rooms].map(value => <button key={value || 'all'} className={room === value ? 'selected' : ''} aria-pressed={room === value} onClick={() => setRoom(value)}>{value || '모든 공간'}<span>{value ? home.items.filter(item => item.room === value).length : home.items.length}</span></button>)}</div>
       <div className="home-filters"><div className="home-search"><Search size={16}/><input type="search" aria-label="꾸미기 품목 검색" value={search} onChange={e => setSearch(e.target.value)} placeholder="품목·색상·소재 검색"/></div><select aria-label="꾸미기 분류 필터" value={category} onChange={e => setCategory(e.target.value)}><option value="">전체 분류</option>{homeCategories.map(value => <option key={value}>{value}</option>)}</select><select aria-label="꾸미기 상태 필터" value={status} onChange={e => setStatus(e.target.value)}><option value="">모든 상태</option>{homeStatuses.map(value => <option key={value}>{value}</option>)}</select><select aria-label="꾸미기 정렬" value={sort} onChange={e => setSort(e.target.value)}>{['등록순','필수 먼저','예정일 빠른순','금액 큰순'].map(value => <option key={value}>{value}</option>)}</select></div>
       {error ? <p className="home-error" role="alert">{error}</p> : null}
       {filtered.length ? <><div className="home-result-count">{room || '모든 공간'} · {filtered.length}개 품목<span>예상 비용 {money(filtered.reduce((sum,item) => sum+homeItemTotals(item).projected,0))}원</span></div><div className="home-item-grid">{filtered.map(item => <HomeItemCard key={item.id} item={item} linkedExpense={data.expenses.find(expense => expense.id === item.expenseId)} canEdit={canEdit} busy={!!busyId} onEdit={() => setDialog({kind:'item',itemId:item.id})} onDelete={() => removeItem(item)} onStatus={nextStatus => changeStatus(item.id,nextStatus)} onLink={() => setDialog({kind:'link',itemId:item.id})} onOpenBudget={onOpenBudget}/>)}</div></> : <div className="home-empty"><div><Sofa size={33}/><Lamp size={25}/></div><h3>{home.items.length ? '조건에 맞는 품목이 없어요.' : '우리 집에 가장 먼저 놓고 싶은 것은?'}</h3><p>{home.items.length ? '다른 공간을 보거나 검색·필터 조건을 바꿔보세요.' : canEdit ? '기본 품목에서 필요한 것만 고르거나, 마음에 드는 제품을 직접 추가해보세요.' : '두 사람의 가구·가전·소품 계획이 여기에 차곡차곡 쌓입니다.'}</p>{canEdit && !home.items.length ? <button className="outline-button" onClick={() => setDialog({kind:'template'})}>기본 품목 둘러보기 <ArrowUpRight size={15}/></button> : null}{home.items.length ? <button className="text-button" onClick={() => {setRoom('');setSearch('');setCategory('');setStatus('')}}>필터 초기화</button> : null}</div>}
     </section>
     <div className="home-budget-note"><Link2 size={17}/><div><strong>꾸미기 계획과 결혼 예산을 함께 관리해요.</strong><p>꾸미기 예산은 별도로 계산합니다. ‘예산에 연결’을 누른 품목만 결혼 예산에 포함되며, 결제는 예산 관리에서 기록하세요.</p></div><button className="text-button" onClick={onOpenBudget}>예산 관리 <ArrowUpRight size={15}/></button></div>
-    {canEdit && dialog ? <HomeDialog key={`${dialog.kind}-${dialog.itemId || 'new'}`} title={dialog.kind === 'budget' ? '신혼집 꾸미기 예산' : dialog.kind === 'template' ? '우리 집 기본 품목 고르기' : dialog.kind === 'link' ? '결혼 예산에 반영' : dialog.itemId ? '꾸미기 항목 수정' : '새 꾸미기 항목'} onClose={() => setDialog(null)}>{dialog.kind === 'budget' ? <HomeBudgetEditor budget={home.budget} onSave={mutate} onClose={() => setDialog(null)}/> : dialog.kind === 'template' ? <HomeTemplatePicker items={home.items} onSave={mutate} onClose={() => setDialog(null)}/> : dialog.itemId && !selectedItem ? <p className="home-error" role="alert">다른 기기에서 삭제된 품목입니다. 창을 닫고 목록을 다시 확인해 주세요.</p> : dialog.kind === 'link' ? <HomeBudgetLink item={selectedItem} linkedExpense={data.expenses.find(expense => expense.id === selectedItem.expenseId)} onSave={mutate} onClose={() => setDialog(null)}/> : <HomeItemEditor item={selectedItem} existingId={dialog.itemId} onSave={mutate} onClose={() => setDialog(null)}/>}</HomeDialog> : null}
+    {canEdit && dialog ? <HomeDialog key={`${dialog.kind}-${dialog.itemId || 'new'}`} title={dialog.kind === 'rooms' ? '우리 집 공간 관리' : dialog.kind === 'budget' ? '신혼집 꾸미기 예산' : dialog.kind === 'template' ? '우리 집 기본 품목 고르기' : dialog.kind === 'link' ? '결혼 예산에 반영' : dialog.itemId ? '꾸미기 항목 수정' : '새 꾸미기 항목'} onClose={() => setDialog(null)}>{dialog.kind === 'rooms' ? <HomeRoomManager data={data} onSave={mutate} onRename={(previousName,nextName) => {if (room === previousName) setRoom(nextName)}}/> : dialog.kind === 'budget' ? <HomeBudgetEditor budget={home.budget} onSave={mutate} onClose={() => setDialog(null)}/> : dialog.kind === 'template' ? <HomeTemplatePicker data={data} onSave={mutate} onClose={() => setDialog(null)}/> : dialog.itemId && !selectedItem ? <p className="home-error" role="alert">다른 기기에서 삭제된 품목입니다. 창을 닫고 목록을 다시 확인해 주세요.</p> : dialog.kind === 'link' ? <HomeBudgetLink item={selectedItem} linkedExpense={data.expenses.find(expense => expense.id === selectedItem.expenseId)} onSave={mutate} onClose={() => setDialog(null)}/> : <HomeItemEditor item={selectedItem} existingId={dialog.itemId} rooms={rooms} initialRoom={room} onSave={mutate} onClose={() => setDialog(null)}/>}</HomeDialog> : null}
   </div>;
 }

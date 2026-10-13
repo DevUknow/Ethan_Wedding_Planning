@@ -22,7 +22,7 @@ test('home items, measurements, prices and status persist and budget links do no
  await expect(card(page)).toContainText('아이보리');await expect(card(page)).toContainText('180');await expect(card(page)).toContainText('900,000');
  await expect(card(page).getByRole('link',{name:/제품 보기/})).toHaveAttribute('href','https://example.com/sofa');await expect(card(page).getByRole('link',{name:/제품 보기/})).toHaveAttribute('rel','noopener noreferrer');
  await page.getByLabel('꾸미기 품목 검색').fill('없는 품목');await expect(card(page)).toHaveCount(0);await page.getByLabel('꾸미기 품목 검색').fill('아이보리');await expect(card(page)).toBeVisible();await page.getByLabel('꾸미기 품목 검색').fill('');
- await page.getByRole('button',{name:'침실 0',exact:true}).click();await expect(card(page)).toHaveCount(0);await page.getByRole('button',{name:'거실 1',exact:true}).click();await expect(card(page)).toBeVisible();
+ await page.getByRole('button',{name:'안방 0',exact:true}).click();await expect(card(page)).toHaveCount(0);await page.getByRole('button',{name:'거실 1',exact:true}).click();await expect(card(page)).toBeVisible();
  await page.getByLabel('우리 소파 준비 상태').selectOption('배송 중');await page.getByLabel('꾸미기 상태 필터').selectOption('설치 완료');await expect(card(page)).toHaveCount(0);await page.getByLabel('꾸미기 상태 필터').selectOption('');
  await card(page).getByRole('button',{name:/예산에 연결/}).click();await page.getByRole('button',{name:'예산에 연결하기',exact:true}).click();await expect(page.getByRole('dialog')).toHaveCount(0);
  await expect(card(page).getByRole('button',{name:/예산 반영/})).toBeVisible();await card(page).getByRole('button',{name:/예산 반영/}).click();await page.getByRole('button',{name:'예산에 반영하기',exact:true}).click();await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -53,5 +53,5 @@ test('home mobile navigation, dialogs and guest browsing preserve data',async({p
  await page.setViewportSize({width:1440,height:1000});await page.evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:'/tmp/our-chapter-home-desktop.png',fullPage:true,animations:'disabled'});
  const before=await page.evaluate(()=>localStorage.getItem('our-chapter-v1'));await page.getByRole('button',{name:'접속 화면으로 돌아가기'}).click();await page.getByRole('button',{name:'게스트로 보기'}).click();
  await page.setViewportSize({width:390,height:844});await page.getByRole('button',{name:'메뉴 열기'}).click();await page.getByRole('button',{name:'신혼집 꾸미기',exact:true}).click();await expect(page.getByRole('heading',{name:'신혼집 꾸미기',exact:true})).toBeVisible();await expect(card(page)).toContainText('우리 소파');
- await expect(page.getByRole('button',{name:/꾸미기 항목 추가|기본 품목 불러오기|꾸미기 예산 설정|예산에 연결|예산 반영/})).toHaveCount(0);await expect(page.getByLabel('우리 소파 준비 상태')).toHaveCount(0);expect(await page.evaluate(()=>localStorage.getItem('our-chapter-v1'))).toBe(before);
+ await expect(page.getByRole('button',{name:/꾸미기 항목 추가|기본 품목 불러오기|꾸미기 예산 설정|공간 관리|예산에 연결|예산 반영/})).toHaveCount(0);await expect(page.getByLabel('우리 소파 준비 상태')).toHaveCount(0);expect(await page.evaluate(()=>localStorage.getItem('our-chapter-v1'))).toBe(before);
 });
