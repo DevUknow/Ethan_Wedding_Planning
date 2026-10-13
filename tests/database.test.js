@@ -4,6 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
 import {initialData} from '../app/src/model.js';
 import {saveExpense,savePayment} from '../app/src/budget-model.js';
+import {saveHomeItem,setHomeBudget,linkHomeItemToBudget} from '../app/src/home-model.js';
 
 test('PostgreSQL restricts writes to verified approved emails and handles revisions',async()=>{
  const db=new PGlite();
@@ -36,9 +37,17 @@ test('PostgreSQL restricts writes to verified approved emails and handles revisi
   tactical=savePayment(tactical,'budget-contract',{id:'deposit',title:'계약금',amount:200,date:'2026-10-13',method:'계좌이체',payer:'공동'});
   const detailed=await db.query('select * from public.save_wedding_state($1,$2::jsonb)',[1,JSON.stringify(tactical)]);
   assert.equal(detailed.rows[0].revision,2);assert.deepEqual(detailed.rows[0].data.expenses,tactical.expenses);
+  let decorated=saveHomeItem(tactical,null,{name:'거실 소파',room:'거실',category:'가구',priority:'필수',status:'구매 예정',quantity:1,plannedUnit:1200000,actualUnit:1100000,width:210,depth:90,height:85,color:'아이보리',material:'패브릭',placement:'거실 오른쪽 벽',productUrl:'https://example.com/sofa',deliveryDate:'2027-05-10',notes:'현관과 엘리베이터 폭 확인'},'home-sofa');
+  decorated=setHomeBudget(decorated,10000000);
+  decorated=linkHomeItemToBudget(decorated,'home-sofa');
+  const homeSaved=await db.query('select * from public.save_wedding_state($1,$2::jsonb)',[2,JSON.stringify(decorated)]);
+  assert.equal(homeSaved.rows[0].revision,3);
+  assert.deepEqual(homeSaved.rows[0].data.home,decorated.home);
+  assert.deepEqual(homeSaved.rows[0].data.expenses,decorated.expenses);
   assert.equal((await db.query('select * from public.save_wedding_state($1,$2::jsonb)',[0,JSON.stringify(initialData)])).rows.length,0);
   await assert.rejects(db.query('select * from public.save_wedding_state($1,$2::jsonb)',[1,JSON.stringify({...data,budget:0})]),/Invalid/);
   await db.exec('reset role;');await db.exec(sql);
-  assert.equal((await db.query('select data from public.wedding_state')).rows[0].data.budget,15000000);
+  const preserved=(await db.query('select data,revision from public.wedding_state')).rows[0];
+  assert.equal(preserved.revision,3);assert.deepEqual(preserved.data,decorated);
  }finally{await db.close()}
 });
