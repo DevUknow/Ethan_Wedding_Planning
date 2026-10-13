@@ -1,5 +1,5 @@
 import {expenseTotals,validExpense} from './budget-model.js';
-import {validHome} from './home-model.js';
+import {validHome,homeRooms,upgradeHomeData} from './home-model.js';
 export const initialData = {
   couple: '송윤오 ♥ 박예은', date: '', budget: 30000000,
   tasks: [
@@ -9,7 +9,7 @@ export const initialData = {
     {id:'t4',title:'초대하고 싶은 사람들 적어보기',category:'하객',due:'',done:false}
   ], expenses: [], guests: [],
   // Retain legacy favorites for existing backups and shared-state compatibility.
-  saved: [], home: {budget:0,items:[]}
+  saved: [], home: {budget:0,items:[],rooms:[...homeRooms],roomVersion:2,templateRooms:{}}
 };
 export function daysUntil(date, today = new Date()) {
   if (!date) return null;
@@ -25,5 +25,5 @@ export function validBackup(data) {
 }
 
 export function upgradeData(data) {
-  return data.couple === 'Ethan & You' ? {...data,couple:initialData.couple} : data;
+  return upgradeHomeData(data.couple === 'Ethan & You' ? {...data,couple:initialData.couple} : data);
 }

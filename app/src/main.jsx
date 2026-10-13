@@ -39,7 +39,7 @@ function App(){
    if(!cloud)return;
    if(cloud.error){setCloudError(cloud.error);return}
    let active=true;
-   const sync=createSynchronizer(cloud,{onData:next=>{if(active){setData(next);setCloudReady(true)}},onStatus:status=>{if(active)setCloudStatus(status)},onError:error=>{if(active){setCloudError(error.message);setNotice('공유 저장소 연결을 확인해 주세요. '+error.message)}}});
+   const sync=createSynchronizer(cloud,{onData:next=>{if(active){setData(upgradeData(next));setCloudReady(true)}},onStatus:status=>{if(active)setCloudStatus(status)},onError:error=>{if(active){setCloudError(error.message);setNotice('공유 저장소 연결을 확인해 주세요. '+error.message)}}});
    syncRef.current=sync;
    void sync.start().catch(()=>{});
    const apply=person=>{if(!active||authSuppressed.current)return;if(person){sessionRef.current=person;setSession(person)}else if(sessionRef.current?.cloud){sessionRef.current=null;setSession(null);setModal(null)}};
@@ -53,8 +53,9 @@ function App(){
  const stat=totals(data),financial=budgetSummary(data),days=daysUntil(data.date),progress=data.tasks.length?Math.round(stat.completed/data.tasks.length*100):0;
  async function update(fn){
    if(!editable(sessionRef.current))return false;
-   if(cloud){try{await syncRef.current.change(fn);return true}catch{return false}}
-   const next=fn(dataRef.current);if(!validBackup(next))throw Error('저장할 기록의 형식이 올바르지 않습니다.');dataRef.current=next;try{localStorage.setItem(STORAGE,JSON.stringify(next))}catch{setNotice('저장 공간을 사용할 수 없습니다. 데이터를 백업해 주세요.')}setData(next);return true;
+   const migrateAndUpdate=current=>upgradeData(fn(upgradeData(current)));
+   if(cloud){try{await syncRef.current.change(migrateAndUpdate);return true}catch{return false}}
+   const next=migrateAndUpdate(dataRef.current);if(!validBackup(next))throw Error('저장할 기록의 형식이 올바르지 않습니다.');dataRef.current=next;try{localStorage.setItem(STORAGE,JSON.stringify(next))}catch{setNotice('저장 공간을 사용할 수 없습니다. 데이터를 백업해 주세요.')}setData(next);return true;
  }
  async function importLocal(){if(!localImport||!editable(sessionRef.current))return;if(window.confirm('이 브라우저에 있던 준비 기록으로 공유 기록을 교체할까요?')){if(await update(()=>localImport)){setLocalImport(null);setNotice('기존 준비 기록을 공유 저장소에 옮겼습니다.')}}}
  function go(p){setPage(p);setMobile(false);setFilter('전체')}
