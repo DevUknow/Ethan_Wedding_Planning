@@ -41,3 +41,16 @@ test('budget layouts and dialogs fit mobile, and guests cannot change detailed r
  const before=await page.evaluate(()=>localStorage.getItem('our-chapter-v1'));await page.getByRole('button',{name:'접속 화면으로 돌아가기'}).click();await page.getByRole('button',{name:'게스트로 보기'}).click();await page.getByRole('button',{name:'예산 관리',exact:true}).click();await page.getByRole('button',{name:name,exact:true}).click();await expect(page.getByText('계약금',{exact:true})).toBeVisible();
  await expect(page.getByRole('button',{name:'예산 항목 추가'})).toHaveCount(0);await expect(page.getByRole('button',{name:/항목 수정|결제 수정|결제 삭제|CSV 내보내기/})).toHaveCount(0);await page.getByRole('button',{name:'결제 가계부',exact:true}).click();await expect(page.locator('.budget-journal-table')).toContainText('200,000');expect(await page.evaluate(()=>localStorage.getItem('our-chapter-v1'))).toBe(before);
 });
+test('guest tables with larger legacy amounts stay inside the tablet viewport',async({page})=>{
+ await page.goto('/');
+ const expenses=[{id:'a',title:'대관 계약금',category:'웨딩홀',amount:2000000},{id:'b',title:'준비 예약금',category:'기타',amount:70000},{id:'c',title:'촬영 패키지 예약금',category:'기타',amount:248000},{id:'d',title:'기타 큰 지출',category:'기타',amount:11000000}];
+ await page.evaluate(expenses=>localStorage.setItem('our-chapter-v1',JSON.stringify({couple:'테스트 커플',date:'',budget:40000000,tasks:[],expenses,guests:[],saved:[]})),expenses);
+ await page.reload();await page.getByRole('button',{name:'게스트로 보기'}).click();await page.getByRole('button',{name:'예산 관리',exact:true}).click();
+ for(const width of [1024,800,768,390,320]){
+  await page.setViewportSize({width,height:844});
+  for(const view of ['항목별 계획','결제 가계부','분류별 집계']){
+   await page.getByRole('button',{name:view,exact:true}).click();
+   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+  }
+ }
+});
