@@ -5,6 +5,7 @@ import {PGlite} from '@electric-sql/pglite';
 import {initialData} from '../app/src/model.js';
 import {saveExpense,savePayment} from '../app/src/budget-model.js';
 import {saveHomeItem,setHomeBudget,linkHomeItemToBudget} from '../app/src/home-model.js';
+import {saveHoneymoonSettings,saveHoneymoonItem,saveHoneymoonPackingItem,linkHoneymoonItemToBudget} from '../app/src/honeymoon-model.js';
 
 test('PostgreSQL restricts writes to verified approved emails and handles revisions',async()=>{
  const db=new PGlite();
@@ -44,10 +45,20 @@ test('PostgreSQL restricts writes to verified approved emails and handles revisi
   assert.equal(homeSaved.rows[0].revision,3);
   assert.deepEqual(homeSaved.rows[0].data.home,decorated.home);
   assert.deepEqual(homeSaved.rows[0].data.expenses,decorated.expenses);
+  let trip=saveHoneymoonSettings(decorated,{destination:'발리',startDate:'2027-05-24',endDate:'2027-05-30',budget:6000000,notes:'우붓과 남부 해변에서 휴식'});
+  trip=saveHoneymoonItem(trip,null,{title:'우붓 숙소',category:'숙소',area:'우붓',status:'예약 완료',date:'2027-05-24',time:'15:00',endDate:'2027-05-27',vendor:'테스트 숙소',plannedAmount:1200000,actualAmount:1100000,productUrl:'https://example.com/ubud-stay',notes:'체크인 시간 확인'},'trip-ubud-stay');
+  trip=saveHoneymoonPackingItem(trip,null,{title:'충전기',done:true},'trip-packing-charger');
+  trip=linkHoneymoonItemToBudget(trip,'trip-ubud-stay');
+  const tripSaved=await db.query('select * from public.save_wedding_state($1,$2::jsonb)',[3,JSON.stringify(trip)]);
+  assert.equal(tripSaved.rows[0].revision,4);
+  assert.deepEqual(tripSaved.rows[0].data,trip);
+  assert.deepEqual(tripSaved.rows[0].data.home,decorated.home);
+  assert.deepEqual(tripSaved.rows[0].data.expenses.slice(0,decorated.expenses.length),decorated.expenses);
+  assert.deepEqual(tripSaved.rows[0].data.expenses.find(expense=>expense.id==='trip-trip-ubud-stay').payments,[]);
   assert.equal((await db.query('select * from public.save_wedding_state($1,$2::jsonb)',[0,JSON.stringify(initialData)])).rows.length,0);
   await assert.rejects(db.query('select * from public.save_wedding_state($1,$2::jsonb)',[1,JSON.stringify({...data,budget:0})]),/Invalid/);
   await db.exec('reset role;');await db.exec(sql);
   const preserved=(await db.query('select data,revision from public.wedding_state')).rows[0];
-  assert.equal(preserved.revision,3);assert.deepEqual(preserved.data,decorated);
+  assert.equal(preserved.revision,4);assert.deepEqual(preserved.data,trip);
  }finally{await db.close()}
 });

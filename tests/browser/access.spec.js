@@ -63,6 +63,9 @@ test('guest can browse every page but cannot modify existing records',async({pag
  await page.getByRole('button',{name:'신혼집 꾸미기',exact:true}).click();
  await expect(page.getByRole('heading',{name:'신혼집 꾸미기',exact:true})).toBeVisible();
  await expect(page.getByRole('button',{name:'꾸미기 항목 추가'})).toHaveCount(0);
+ await page.getByRole('button',{name:'신혼여행',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'신혼여행',exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'예약 항목 추가'})).toHaveCount(0);
  await page.reload();
  await expect(page.locator('.role-badge')).toHaveText('게스트 · 읽기 전용');
  expect(JSON.parse(await page.evaluate(()=>localStorage.getItem('our-chapter-v1')))).toEqual(data);
