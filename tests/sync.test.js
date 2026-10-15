@@ -35,3 +35,15 @@ test('simultaneous deposits on one contract preserve both payments',async()=>{
  await Promise.all([a.change(data=>savePayment(data,'contract',{...payment,id:'payment-a',amount:200})),b.change(data=>savePayment(data,'contract',{...payment,id:'payment-b',amount:300}))]);
  assert.equal(first.expenses[0].payments.length,2);assert.equal(expenseTotals(first.expenses[0]).paid,500);assert.equal(expenseTotals(first.expenses[0]).outstanding,500);assert.deepEqual(first,second);a.stop();b.stop();
 });
+
+test('leaving during a private read prevents late subscriptions and pending writes',async()=>{
+ let release,subscriptions=0,writes=0,delivered=0;
+ const backend={read:()=>new Promise(resolve=>{release=()=>resolve({revision:0,data:structuredClone(initialData)})}),listen(){subscriptions++;return()=>{}},async write(){writes++;return null}};
+ const sync=createSynchronizer(backend,{onData(){delivered++},onStatus(){},onError(){}});
+ const starting=sync.start();sync.stop();release();await starting;
+ assert.equal(subscriptions,0);assert.equal(delivered,0);
+ const editing=createSynchronizer(backend,{onData(){delivered++},onStatus(){},onError(){}});
+ const pending=editing.change(current=>({...current,budget:100}));
+ await Promise.resolve();editing.stop();release();
+ await assert.rejects(pending,/종료/);assert.equal(writes,0);assert.equal(delivered,0);
+});

@@ -45,13 +45,13 @@ test('home budget and selected starter items work and previous backups can be re
  await addSofa(page);stored=await page.evaluate(()=>JSON.parse(localStorage.getItem('our-chapter-v1')));expect(stored.expenses[0].title).toBe('기존 지출');expect(stored.home.items).toHaveLength(1);
 });
 
-test('home mobile navigation, dialogs and guest browsing preserve data',async({page})=>{
+test('home mobile dialogs work and guest invitation hides private decorating records',async({page})=>{
  await admin(page);await addSofa(page);
  for(const width of [1024,768,390,320]){await page.setViewportSize({width,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)}
  await page.setViewportSize({width:390,height:844});await page.evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:'/tmp/our-chapter-home-mobile.png',fullPage:true,animations:'disabled'});
  await card(page).getByRole('button',{name:/수정/}).click();const box=await page.getByRole('dialog').boundingBox();expect(box.x).toBeGreaterThanOrEqual(0);expect(box.width).toBeLessThanOrEqual(390);await page.keyboard.press('Escape');await expect(card(page).getByRole('button',{name:/수정/})).toBeFocused();
  await page.setViewportSize({width:1440,height:1000});await page.evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:'/tmp/our-chapter-home-desktop.png',fullPage:true,animations:'disabled'});
- const before=await page.evaluate(()=>localStorage.getItem('our-chapter-v1'));await page.getByRole('button',{name:'접속 화면으로 돌아가기'}).click();await page.getByRole('button',{name:'게스트로 보기'}).click();
- await page.setViewportSize({width:390,height:844});await page.getByRole('button',{name:'메뉴 열기'}).click();await page.getByRole('button',{name:'신혼집 꾸미기',exact:true}).click();await expect(page.getByRole('heading',{name:'신혼집 꾸미기',exact:true})).toBeVisible();await expect(card(page)).toContainText('우리 소파');
- await expect(page.getByRole('button',{name:/꾸미기 항목 추가|기본 품목 불러오기|꾸미기 예산 설정|공간 관리|예산에 연결|예산 반영/})).toHaveCount(0);await expect(page.getByLabel('우리 소파 준비 상태')).toHaveCount(0);expect(await page.evaluate(()=>localStorage.getItem('our-chapter-v1'))).toBe(before);
+ await page.getByRole('button',{name:'접속 화면으로 돌아가기'}).click();const beforeGuest=await page.evaluate(()=>localStorage.getItem('our-chapter-v1'));await page.getByRole('button',{name:'게스트로 보기'}).click();
+ await page.setViewportSize({width:390,height:844});await expect(page.locator('.invitation-page')).toBeVisible();await expect(page.getByRole('button',{name:'신혼집 꾸미기',exact:true})).toHaveCount(0);await expect(card(page)).toHaveCount(0);
+ await expect(page.getByRole('button',{name:/꾸미기 항목 추가|기본 품목 불러오기|꾸미기 예산 설정|공간 관리|예산에 연결|예산 반영/})).toHaveCount(0);await expect(page.getByLabel('우리 소파 준비 상태')).toHaveCount(0);expect(await page.evaluate(()=>localStorage.getItem('our-chapter-v1'))).toBe(beforeGuest);
 });

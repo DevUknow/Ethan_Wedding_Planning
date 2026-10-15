@@ -20,17 +20,26 @@ test('PostgreSQL restricts writes to verified approved emails and handles revisi
   const sql=await readFile(new URL('../supabase/setup.sql',import.meta.url),'utf8');
   await db.exec(sql);await db.exec(sql); // Setup is repeatable and keeps existing records.
   await db.exec(`insert into private.wedding_admins values ('admin@example.com','송윤오'),('unconfirmed@example.com','박예은');set role anon;`);
-  assert.equal((await db.query('select * from public.wedding_state')).rows.length,1);
+  await assert.rejects(db.query('select * from public.wedding_state'), /permission denied/);
+  const publicSeed=(await db.query('select * from public.wedding_invitation')).rows[0];
+  assert.equal(publicSeed.data.groom,'송윤오');assert.equal(publicSeed.data.bride,'박예은');assert.equal(publicSeed.data.date,'');
+  assert.deepEqual(Object.keys(publicSeed.data).sort(),['groom','bride','date','time','greeting','heroPhoto','gallery','directionsNote','contactGroom','contactBride'].sort());
+  await assert.rejects(db.query("update public.wedding_invitation set data='{}'::jsonb"));
   await assert.rejects(db.query('update public.wedding_state set revision=999'));
   await assert.rejects(db.query("select * from public.save_wedding_state(0,'{}'::jsonb)"));
   await db.exec(`reset role;set role authenticated;select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000002',false);`);
   assert.equal((await db.query('select public.get_wedding_role() as role')).rows[0].role,null);
+  assert.equal((await db.query('select * from public.wedding_state')).rows.length,0);
+  assert.equal((await db.query('select * from public.wedding_invitation')).rows.length,1);
+  await assert.rejects(db.query('select private.invitation_projection($1::jsonb)',[JSON.stringify(initialData)]), /permission denied/);
   await assert.rejects(db.query('select * from public.save_wedding_state($1,$2::jsonb)',[0,JSON.stringify(initialData)]),/Administrator/);
   await assert.rejects(db.query('select * from private.wedding_admins'));
   await db.exec(`select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000003',false);`);
   await assert.rejects(db.query('select * from public.save_wedding_state($1,$2::jsonb)',[0,JSON.stringify(initialData)]),/Administrator/);
   await db.exec(`select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false);`);
   assert.equal((await db.query('select public.get_wedding_role() as role')).rows[0].role.name,'송윤오');
+  assert.equal((await db.query('select * from public.wedding_state')).rows.length,1);
+  await assert.rejects(db.query("update public.wedding_invitation set data='{}'::jsonb"));
   const data={...initialData,budget:15000000};
   const saved=await db.query('select * from public.save_wedding_state($1,$2::jsonb)',[0,JSON.stringify(data)]);
   assert.equal(saved.rows[0].revision,1);assert.equal(saved.rows[0].data.budget,15000000);
@@ -55,10 +64,107 @@ test('PostgreSQL restricts writes to verified approved emails and handles revisi
   assert.deepEqual(tripSaved.rows[0].data.home,decorated.home);
   assert.deepEqual(tripSaved.rows[0].data.expenses.slice(0,decorated.expenses.length),decorated.expenses);
   assert.deepEqual(tripSaved.rows[0].data.expenses.find(expense=>expense.id==='trip-trip-ubud-stay').payments,[]);
+  const photo={id:'public-photo',url:'https://example.com/wedding.jpg',alt:'우리의 사진',privateContract:'never public'};
+  const invitation={groom:'신랑 이름',bride:'신부 이름',time:'14:30',greeting:'함께해 주세요.',heroPhoto:photo,gallery:[photo],directionsNote:'대중교통 이용을 권장합니다.',contactGroom:'010-1234-5678',contactBride:'',budget:'private invitation unknown key'};
+  const invited={...trip,date:'2027-05-23',invitation};
+  const invitationSaved=await db.query('select * from public.save_wedding_state($1,$2::jsonb)',[4,JSON.stringify(invited)]);
+  assert.equal(invitationSaved.rows[0].revision,5);assert.deepEqual(invitationSaved.rows[0].data,invited);
+  const publicInvitation=(await db.query('select * from public.wedding_invitation')).rows[0];
+  assert.equal(publicInvitation.revision,5);assert.equal(publicInvitation.data.date,invited.date);
+  assert.equal(publicInvitation.data.groom,invitation.groom);assert.equal(publicInvitation.data.bride,invitation.bride);
+  assert.deepEqual(publicInvitation.data.heroPhoto,{id:photo.id,url:photo.url,alt:photo.alt});
+  assert.deepEqual(publicInvitation.data.gallery,[{id:photo.id,url:photo.url,alt:photo.alt}]);
+  for(const key of ['budget','tasks','expenses','guests','home','honeymoon','saved']) assert.equal(Object.hasOwn(publicInvitation.data,key),false);
   assert.equal((await db.query('select * from public.save_wedding_state($1,$2::jsonb)',[0,JSON.stringify(initialData)])).rows.length,0);
-  await assert.rejects(db.query('select * from public.save_wedding_state($1,$2::jsonb)',[1,JSON.stringify({...data,budget:0})]),/Invalid/);
+  assert.deepEqual((await db.query('select * from public.wedding_invitation')).rows[0],publicInvitation);
+  for(const invalid of [
+    {...invited,budget:0},
+    {...invited,date:'2027-02-30'},
+    {...invited,invitation:{...invitation,time:'25:00'}},
+    {...invited,invitation:{...invitation,groom:''}},
+    {...invited,invitation:{...invitation,heroPhoto:{...photo,url:'javascript:alert(1)'}}},
+    {...invited,invitation:{...invitation,heroPhoto:{...photo,url:'https://user:secret@example.com/photo'}}},
+    {...invited,invitation:{...invitation,gallery:[photo,photo]}},
+    {...invited,invitation:{...invitation,contactBride:'not a phone'}},
+    {...invited,invitation:{...invitation,greeting:'x'.repeat(3001)}},
+    {...invited,invitation:{...invitation,heroPhoto:{id:'missing-url',alt:''}}},
+  ]) await assert.rejects(db.query('select * from public.save_wedding_state($1,$2::jsonb)',[5,JSON.stringify(invalid)]),/Invalid/);
+  assert.deepEqual((await db.query('select * from public.wedding_invitation')).rows[0],publicInvitation);
   await db.exec('reset role;');await db.exec(sql);
+  const upgrade=await readFile(new URL('../supabase/invitation-upgrade.sql',import.meta.url),'utf8');
+  await db.exec(upgrade);await db.exec(upgrade);
   const preserved=(await db.query('select data,revision from public.wedding_state')).rows[0];
-  assert.equal(preserved.revision,4);assert.deepEqual(preserved.data,trip);
+  assert.equal(preserved.revision,5);assert.deepEqual(preserved.data,invited);
+  await db.exec('set role anon;');
+  await assert.rejects(db.query('select * from public.wedding_state'), /permission denied/);
+  const anonymous=(await db.query('select * from public.wedding_invitation')).rows[0];
+  assert.deepEqual(anonymous,publicInvitation);
+ }finally{await db.close()}
+});
+
+test('two-phase invitation upgrade preserves records and only approved admins manage public photos',async()=>{
+ const db=new PGlite();
+ try{
+  await db.exec(`create role anon;create role authenticated;create schema auth;
+    grant usage on schema public to anon,authenticated;
+    create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz);
+    create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
+    insert into auth.users values
+      ('00000000-0000-0000-0000-000000000001','admin@example.com',now()),
+      ('00000000-0000-0000-0000-000000000002','guest@example.com',now());
+    create schema private;
+    create table private.wedding_admins(email text primary key,name text);
+    insert into private.wedding_admins values ('admin@example.com','송윤오');
+    revoke all on schema private from public,anon,authenticated;
+    create function private.is_wedding_admin() returns boolean language sql stable security definer set search_path='' as $$
+      select exists(select 1 from auth.users u join private.wedding_admins a on lower(u.email)=a.email where u.id=auth.uid() and u.email_confirmed_at is not null);
+    $$;
+    revoke all on function private.is_wedding_admin() from public,anon,authenticated;
+    create table public.wedding_state(id text primary key,data jsonb not null,revision bigint not null default 0,updated_at timestamptz not null default now());
+    alter table public.wedding_state enable row level security;
+    grant select on public.wedding_state to anon,authenticated;
+    create policy wedding_read on public.wedding_state for select to anon,authenticated using (id='main');
+    create schema storage;grant usage on schema storage to anon,authenticated;
+    create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
+    create table storage.objects(id text primary key,bucket_id text,name text);
+    alter table storage.objects enable row level security;
+    grant select,insert,update,delete on storage.objects to anon,authenticated;`);
+  const prior={...initialData,date:'2027-06-13',budget:31000000,invitation:{groom:'malformed missing fields',budget:'must stay private'}};
+  await db.query("insert into public.wedding_state(id,data,revision,updated_at) values ('main',$1::jsonb,17,'2026-10-15T00:00:00Z')",[JSON.stringify(prior)]);
+  const before=(await db.query('select * from public.wedding_state')).rows[0];
+  const prep=await readFile(new URL('../supabase/invitation-prepare.sql',import.meta.url),'utf8');
+  await db.exec(prep);await db.exec(prep);
+  assert.deepEqual((await db.query('select * from public.wedding_state')).rows[0],before);
+  const bucket=(await db.query("select * from storage.buckets where id='wedding-invitation'")).rows[0];
+  assert.equal(bucket.public,true);assert.equal(bucket.file_size_limit,10485760);
+  assert.deepEqual(bucket.allowed_mime_types,['image/jpeg','image/png','image/webp','image/avif']);
+  await db.exec('set role anon;');
+  assert.equal((await db.query('select * from public.wedding_state')).rows.length,1); // Preparation leaves the old frontend working.
+  const publicSeed=(await db.query('select * from public.wedding_invitation')).rows[0];
+  assert.equal(publicSeed.revision,17);assert.equal(publicSeed.data.date,prior.date);
+  assert.equal(publicSeed.data.groom,'송윤오');assert.equal(publicSeed.data.bride,'박예은');
+  assert.equal(Object.hasOwn(publicSeed.data,'budget'),false);
+  await assert.rejects(db.query("insert into storage.objects values ('unauthorized','wedding-invitation','photo.jpg')"),/row-level security/);
+  await db.exec("reset role;set role authenticated;select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000002',false);");
+  await assert.rejects(db.query("insert into storage.objects values ('unauthorized','wedding-invitation','photo.jpg')"),/row-level security/);
+  await db.exec("select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false);");
+  await db.exec("insert into storage.objects values ('approved','wedding-invitation','photo.jpg');update storage.objects set name='replacement.jpg' where id='approved';");
+  assert.equal((await db.query("select name from storage.objects where id='approved'")).rows[0].name,'replacement.jpg');
+  await assert.rejects(db.query("update storage.objects set bucket_id='private-contracts' where id='approved'"),/row-level security/);
+  await db.exec("reset role;set role anon;");
+  assert.equal((await db.query('select * from storage.objects')).rows.length,1);
+  assert.equal((await db.query("delete from storage.objects where id='approved' returning *")).rows.length,0);
+  await db.exec("reset role;set role authenticated;select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000002',false);");
+  assert.equal((await db.query("update storage.objects set name='unauthorized.jpg' where id='approved' returning *")).rows.length,0);
+  await db.exec('reset role;');
+  const final=await readFile(new URL('../supabase/invitation-upgrade.sql',import.meta.url),'utf8');
+  await db.exec(final);await db.exec(final);
+  assert.deepEqual((await db.query('select * from public.wedding_state')).rows[0],before);
+  await db.exec('set role anon;');
+  await assert.rejects(db.query('select * from public.wedding_state'),/permission denied/);
+  assert.deepEqual((await db.query('select * from public.wedding_invitation')).rows[0],publicSeed);
+  await db.exec("reset role;set role authenticated;select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false);");
+  await db.exec("delete from storage.objects where id='approved';");
+  assert.equal((await db.query('select * from storage.objects')).rows.length,0);
  }finally{await db.close()}
 });

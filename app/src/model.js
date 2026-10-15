@@ -1,6 +1,7 @@
 import {expenseTotals,validExpense} from './budget-model.js';
 import {validHome,homeRooms,upgradeHomeData} from './home-model.js';
 import {validHoneymoon} from './honeymoon-model.js';
+import {validInvitationSettings} from './invitation-model.js';
 export const initialData = {
   couple: '송윤오 ♥ 박예은', date: '', budget: 30000000,
   tasks: [
@@ -23,7 +24,7 @@ export function totals(data) {
   return {spent,remaining:data.budget-spent,completed:data.tasks.filter(t=>t.done).length,confirmed:data.guests.filter(g=>g.status==='참석').length};
 }
 export function validBackup(data) {
- return !!data && typeof data.couple==='string' && typeof data.date==='string' && (data.date==='' || /^\d{4}-\d{2}-\d{2}$/.test(data.date)) && Number.isFinite(data.budget) && data.budget>0 && Array.isArray(data.tasks) && data.tasks.every(t=>typeof t.id==='string'&&typeof t.title==='string'&&typeof t.category==='string'&&typeof t.due==='string'&&typeof t.done==='boolean') && Array.isArray(data.expenses)&&data.expenses.every(validExpense) && Array.isArray(data.guests)&&data.guests.every(g=>typeof g.id==='string'&&typeof g.name==='string'&&typeof g.side==='string'&&['미정','참석','불참'].includes(g.status)) && Array.isArray(data.saved)&&data.saved.every(s=>typeof s==='string') && (!Object.hasOwn(data,'home') || validHome(data.home)) && (!Object.hasOwn(data,'honeymoon') || validHoneymoon(data.honeymoon));
+ return !!data && typeof data.couple==='string' && typeof data.date==='string' && (data.date==='' || /^\d{4}-\d{2}-\d{2}$/.test(data.date)) && Number.isFinite(data.budget) && data.budget>0 && Array.isArray(data.tasks) && data.tasks.every(t=>typeof t.id==='string'&&typeof t.title==='string'&&typeof t.category==='string'&&typeof t.due==='string'&&typeof t.done==='boolean') && Array.isArray(data.expenses)&&data.expenses.every(validExpense) && Array.isArray(data.guests)&&data.guests.every(g=>typeof g.id==='string'&&typeof g.name==='string'&&typeof g.side==='string'&&['미정','참석','불참'].includes(g.status)) && Array.isArray(data.saved)&&data.saved.every(s=>typeof s==='string') && (!Object.hasOwn(data,'home') || validHome(data.home)) && (!Object.hasOwn(data,'honeymoon') || validHoneymoon(data.honeymoon)) && (!Object.hasOwn(data,'invitation') || validInvitationSettings(data.invitation));
 }
 
 export function upgradeData(data) {

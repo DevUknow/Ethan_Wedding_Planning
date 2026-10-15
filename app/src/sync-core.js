@@ -11,7 +11,7 @@ export function createSynchronizer(backend,{onData,onStatus,onError}) {
   async function refresh(){const row=await backend.read();accept(row);return row}
   async function start(){
     onStatus('connecting');
-    try{await refresh();onStatus('synced');
+    try{await refresh();if(!alive)return;onStatus('synced');
       unsubscribe=backend.listen(row=>{try{accept(row)}catch(error){onStatus('error');onError(error)}},status=>{
         if(!alive)return;
         if(status==='SUBSCRIBED')refresh().then(()=>onStatus('synced')).catch(error=>{onStatus('offline');onError(error)});
@@ -26,6 +26,7 @@ export function createSynchronizer(backend,{onData,onStatus,onError}) {
       try{
         for(let attempt=0;attempt<4;attempt++){
           const current=await backend.read();
+          if(!alive)throw Error('연결이 종료되었습니다.');
           const next=mutator(structuredClone(current.data));
           if(!validBackup(next))throw Error('저장할 기록의 형식이 올바르지 않습니다.');
           const saved=await backend.write(Number(current.revision),next);
