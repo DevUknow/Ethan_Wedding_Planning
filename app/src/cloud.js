@@ -52,7 +52,7 @@ export function createCloudServices(){
         if(role?.role!=='admin')return null;
         return {role:'admin',id:role.name==='송윤오'?'yoono':'yeeun',name:role.name,cloud:true};
       },
-      async sendCode(email){check(await client.auth.signInWithOtp({email,options:{shouldCreateUser:true}}))},
+      async sendCode(email){check(await client.auth.signInWithOtp({email,options:{shouldCreateUser:false}}))},
       async verifyCode(email,token,name){
         check(await client.auth.verifyOtp({email,token,type:'email'}));
         const person=await this.getAdministrator();
