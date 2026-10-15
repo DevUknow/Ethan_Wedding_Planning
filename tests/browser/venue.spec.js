@@ -2,7 +2,9 @@ import {test, expect} from '@playwright/test';
 
 test.beforeEach(async ({page}) => {
   await page.goto('/');
-  await page.getByRole('button', {name: '게스트로 보기'}).click();
+  await page.getByLabel('이름',{exact:true}).fill('송윤오');
+  await page.getByLabel('별명',{exact:true}).fill('예쁜강아지');
+  await page.getByRole('button',{name:'관리자로 들어가기'}).click();
 });
 
 test('dashboard opens the actual venue with local photos and visitor links', async ({page}) => {

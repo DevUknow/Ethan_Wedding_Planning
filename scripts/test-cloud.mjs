@@ -4,281 +4,190 @@ import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import {chromium,expect} from '@playwright/test';
+import {toPublicInvitation,validInvitation} from '../app/src/invitation-model.js';
 
+// This fixture never contacts a real account, uploads a real private photo, or
+// changes production records. It exercises the deployed cloud code with RLS-like
+// responses, including a separate public invitation table and Storage bucket.
 const output='/tmp/our-chapter-cloud-test';
 execFileSync(process.execPath,['node_modules/vite/bin/vite.js','build','--outDir',output],{stdio:'inherit',env:{...process.env,VITE_SUPABASE_URL:'https://sync-test.supabase.co',VITE_SUPABASE_PUBLISHABLE_KEY:'sb_publishable_test'}});
-const server=createServer(async(req,res)=>{try{const requested=decodeURIComponent(new URL(req.url,'http://localhost').pathname);const filename=path.resolve(output,'.'+(requested==='/'?'/index.html':requested));if(!filename.startsWith(output+'/'))throw Error();const content=await readFile(filename);res.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml'})[path.extname(filename)]||'application/octet-stream');res.end(content)}catch{res.statusCode=404;res.end()}});
+const mime={'.html':'text/html','.js':'text/javascript','.css':'text/css','.svg':'image/svg+xml','.webp':'image/webp','.jpg':'image/jpeg','.png':'image/png'};
+const server=createServer(async(req,res)=>{try{const requested=decodeURIComponent(new URL(req.url,'http://localhost').pathname);const filename=path.resolve(output,'.'+(requested==='/'?'/index.html':requested));if(!filename.startsWith(output+'/'))throw Error();const content=await readFile(filename);res.setHeader('Content-Type',mime[path.extname(filename)]||'application/octet-stream');res.end(content)}catch{res.statusCode=404;res.end()}});
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const url=`http://127.0.0.1:${server.address().port}`;
 const browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{})});
-let row={id:'main',revision:0,data:{couple:'송윤오 ♥ 박예은',date:'',budget:30000000,tasks:[],expenses:[],guests:[],saved:[]}};
-let writes=0;const sockets=new Set(),errors=[];
+let row={id:'main',revision:0,data:{couple:'송윤오 ♥ 박예은',date:'2027-04-17',budget:30000000,tasks:[],expenses:[],guests:[],saved:[],futurePrivateSecret:'private-future-token'}};
+let publicRow={id:'main',revision:0,data:toPublicInvitation(row.data)};
+let writes=0,conflicts=0,injectConflict=false,holdNextWrite=false,releaseWrite=null;
+const sockets=new Set(),errors=[],requests=[],publicResponses=[],storage=new Map();
 const user={id:'00000000-0000-0000-0000-000000000001',aud:'authenticated',role:'authenticated',email:'admin@example.com',email_confirmed_at:new Date().toISOString(),app_metadata:{provider:'email',providers:['email']},user_metadata:{},identities:[],created_at:new Date().toISOString()};
 const token=[Buffer.from('{"alg":"HS256","typ":"JWT"}').toString('base64url'),Buffer.from(JSON.stringify({sub:user.id,role:'authenticated',exp:Math.floor(Date.now()/1000)+3600})).toString('base64url'),'fixture'].join('.');
-function publish(){for(const socket of sockets)socket.send('postgres_changes',{ids:[1],data:{schema:'public',table:'wedding_state',type:'UPDATE',columns:[{name:'id',type:'text'},{name:'data',type:'jsonb'},{name:'revision',type:'int8'}],record:row,old_record:{},commit_timestamp:new Date().toISOString()}})}
-async function context(){
- const context=await browser.newContext();
+function publish(table){const record=table==='wedding_state'?row:publicRow;for(const socket of sockets)if(socket.table===table)socket.send('postgres_changes',{ids:[1],data:{schema:'public',table,type:'UPDATE',columns:[{name:'id',type:'text'},{name:'data',type:'jsonb'},{name:'revision',type:'int8'}],record,old_record:{},commit_timestamp:new Date().toISOString()}})}
+function commit(data){writes++;row={...row,revision:row.revision+1,data};publicRow={...publicRow,revision:row.revision,data:toPublicInvitation(data)};publish('wedding_state');publish('wedding_invitation')}
+async function context(label){
+ const context=await browser.newContext({locale:'ko-KR',timezoneId:'Asia/Seoul',viewport:{width:1440,height:1000}});
  await context.route('https://fonts.googleapis.com/**',route=>route.abort());
  await context.route('https://sync-test.supabase.co/**',async route=>{
-  const request=route.request(),p=new URL(request.url()).pathname,body=request.postDataJSON(),authorized=request.headers().authorization===`Bearer ${token}`;
+  const request=route.request(),p=new URL(request.url()).pathname,authorized=request.headers().authorization===`Bearer ${token}`,probe=request.headers()['x-security-probe']==='1';
+  requests.push({label,path:p,method:request.method(),authorized,probe});
+  const headers={'access-control-allow-origin':'*','access-control-allow-headers':'*','access-control-allow-methods':'GET,POST,OPTIONS'};
+  if(request.method()==='OPTIONS'){await route.fulfill({status:204,headers});return}
+  let body;try{body=request.postDataJSON()}catch{}
   let data,status=200;
-  if(p==='/rest/v1/wedding_state')data=row;
+  if(p==='/rest/v1/wedding_state'){
+   if(!authorized){status=403;data={message:'Administrator required',code:'42501'}}else data=row;
+  }else if(p==='/rest/v1/wedding_invitation'){data=publicRow;publicResponses.push(structuredClone(data.data))}
   else if(p==='/auth/v1/otp')data={};
   else if(p==='/auth/v1/verify')data={access_token:token,refresh_token:'fixture-refresh',token_type:'bearer',expires_in:3600,user};
-  else if(p==='/auth/v1/user')data=user;
+  else if(p==='/auth/v1/user'){if(authorized)data=user;else{status=401;data={message:'Invalid token'}}}
   else if(p==='/auth/v1/logout'){status=204;data=null}
   else if(p==='/rest/v1/rpc/get_wedding_role')data=authorized?{role:'admin',name:'송윤오'}:null;
   else if(p==='/rest/v1/rpc/save_wedding_state'){
    if(!authorized){status=403;data={message:'Administrator required',code:'42501'}}
-   else if(body._expected_revision!==row.revision)data=[];
-   else{writes++;row={...row,revision:row.revision+1,data:body._new_data};data=[row];publish()}
+   else{
+    if(holdNextWrite){holdNextWrite=false;await new Promise(resolve=>{releaseWrite=resolve})}
+    if(injectConflict){injectConflict=false;commit({...row.data,tasks:[...row.data.tasks,{id:'external-task',title:'비공개 동시 수정 보존',category:'기타',due:'',done:false}]})}
+    if(body._expected_revision!==row.revision){conflicts++;data=[]}
+    else{commit(body._new_data);data=[row]}
+   }
+  }else if(p.startsWith('/storage/v1/object/public/wedding-invitation/')){
+   const object=storage.get(p.replace('/storage/v1/object/public/',''));
+   if(object){await route.fulfill({status:200,headers,contentType:object.type,body:object.bytes});return}
+   status=404;data={message:'Not found'};
+  }else if(p.startsWith('/storage/v1/object/wedding-invitation/')&&request.method()==='POST'){
+   if(!authorized){status=403;data={message:'Administrator required'}}else{
+    const objectPath=p.replace('/storage/v1/object/','');
+    let type=request.headers()['content-type']||'image/jpeg',bytes=request.postDataBuffer();
+    if(type.startsWith('multipart/form-data')){
+     const form=await new Request(request.url(),{method:'POST',headers:{'content-type':type},body:bytes}).formData();
+     const image=form.get('');type=image.type;bytes=Buffer.from(await image.arrayBuffer());
+    }
+    assert.equal(type,'image/jpeg');assert.equal(bytes.subarray(0,2).toString('hex'),'ffd8');
+    storage.set(objectPath,{type,bytes});
+    data={Key:objectPath,Id:crypto.randomUUID()};
+   }
   }else{status=404;data={message:'Unexpected fixture request '+p}}
-  await route.fulfill({status,contentType:'application/json',...(status===204?{}:{body:JSON.stringify(data)})});
+  await route.fulfill({status,headers,contentType:'application/json',...(status===204?{}:{body:JSON.stringify(data)})});
  });
  await context.routeWebSocket('wss://sync-test.supabase.co/**',ws=>{
-  let channel;
+  const channels=new Map();
   ws.onMessage(raw=>{
    const decoded=JSON.parse(raw),array=Array.isArray(decoded);
    const msg=array?{join_ref:decoded[0],ref:decoded[1],topic:decoded[2],event:decoded[3],payload:decoded[4]}:decoded;
-   function send(event,payload){ws.send(JSON.stringify(array?[msg.join_ref,null,msg.topic,event,payload]:{join_ref:msg.join_ref,ref:null,topic:msg.topic,event,payload}))}
+   const reply=payload=>ws.send(JSON.stringify(array?[msg.join_ref,msg.ref,msg.topic,'phx_reply',payload]:{...msg,event:'phx_reply',payload}));
    if(msg.event==='phx_join'){
-    channel={send};sockets.add(channel);
-    const payload={status:'ok',response:{postgres_changes:[{id:1,event:'UPDATE',schema:'public',table:'wedding_state',filter:'id=eq.main'}]}};
-    ws.send(JSON.stringify(array?[msg.join_ref,msg.ref,msg.topic,'phx_reply',payload]:{...msg,event:'phx_reply',payload}));
-   }else if(msg.event==='heartbeat')ws.send(JSON.stringify(array?[msg.join_ref,msg.ref,msg.topic,'phx_reply',{status:'ok',response:{}}]:{...msg,event:'phx_reply',payload:{status:'ok',response:{}}}));
+    const table=msg.payload.config?.postgres_changes?.[0]?.table;
+    requests.push({label,path:`realtime/${table}`,method:'SUBSCRIBE',authorized:msg.payload.access_token===token,probe:false});
+    const channel={table,send(event,payload){ws.send(JSON.stringify(array?[msg.join_ref,null,msg.topic,event,payload]:{join_ref:msg.join_ref,ref:null,topic:msg.topic,event,payload}))}};
+    channels.set(msg.topic,channel);sockets.add(channel);
+    reply({status:'ok',response:{postgres_changes:[{id:1,event:'UPDATE',schema:'public',table,filter:'id=eq.main'}]}});
+   }else if(msg.event==='phx_leave'){sockets.delete(channels.get(msg.topic));channels.delete(msg.topic);reply({status:'ok',response:{}})}
+   else if(msg.event==='heartbeat')reply({status:'ok',response:{}});
   });
-  ws.onClose(()=>sockets.delete(channel));
+  ws.onClose(()=>{for(const channel of channels.values())sockets.delete(channel)});
  });
+ context.on('page',page=>page.on('pageerror',error=>errors.push(error.message)));
  return context;
 }
+async function login(page){
+ await page.goto(url);await expect(page.getByLabel('관리자 이메일')).toBeVisible();
+ await page.getByLabel('이름',{exact:true}).fill('송윤오');await page.getByLabel('별명').fill('예쁜강아지');await page.getByLabel('관리자 이메일').fill('admin@example.com');
+ await page.getByRole('button',{name:'인증 메일 받기'}).click();await page.getByLabel('이메일 인증 코드').fill('123456');await page.getByRole('button',{name:'인증하고 들어가기'}).click();
+ await expect(page.locator('.role-badge')).toHaveText('송윤오 · 관리자');
+ await expect(page.locator('.sync-banner')).toContainText('공유 기록이 연결되어 있어요');
+}
+const privatePath=request=>request.path==='/rest/v1/wedding_state'||request.path==='/rest/v1/rpc/save_wedding_state'||request.path==='realtime/wedding_state';
+async function expectPublic(page){
+ await expect(page.locator('.invitation-paper')).toBeVisible();
+ await expect(page.getByRole('heading',{name:'우리, 결혼합니다',exact:true})).toBeVisible();
+ await expect(page.locator('.invitation-paper')).toContainText('브리에홀');
+ for(const name of ['예산 관리','체크리스트','하객 관리','신혼집 꾸미기','신혼여행','백업','복원'])await expect(page.getByRole('button',{name,exact:true})).toHaveCount(0);
+ for(const secret of ['비공개 준비 할 일','비공개 동시 수정 보존','비공개 하객','비공개 웨딩홀','비공개 원목 식탁','비공개 우붓 숙소','private-future-token'])await expect(page.locator('body')).not.toContainText(secret);
+}
 try{
- const admin=await context(),guest=await context(),a=await admin.newPage(),g=await guest.newPage();
- for(const page of [a,g])page.on('pageerror',error=>errors.push(error.message));
- await a.goto(url);await expect(a.getByLabel('관리자 이메일')).toBeVisible();
- await a.getByLabel('이름',{exact:true}).fill('송윤오');await a.getByLabel('별명').fill('예쁜강아지');await a.getByLabel('관리자 이메일').fill('admin@example.com');
- await a.getByRole('button',{name:'인증 메일 받기'}).click();await a.getByLabel('이메일 인증 코드').fill('123456');await a.getByRole('button',{name:'인증하고 들어가기'}).click();
- await expect(a.locator('.role-badge')).toHaveText('송윤오 · 관리자');
- await g.goto(url);await g.getByRole('button',{name:'게스트로 보기'}).click();
- await g.getByRole('button',{name:'체크리스트',exact:true}).click();
- await a.getByRole('button',{name:'체크리스트',exact:true}).click();await a.getByRole('button',{name:'할 일 추가',exact:true}).click();await a.getByLabel('할 일',{exact:true}).fill('동기화 테스트 할 일');await a.getByRole('button',{name:'저장하기'}).click();
- await expect(g.getByText('동기화 테스트 할 일',{exact:true})).toBeVisible();
- await a.getByRole('button',{name:'동기화 테스트 할 일 완료',exact:true}).click();
- await expect(g.getByRole('button',{name:'동기화 테스트 할 일 완료 취소'})).toBeDisabled();
- const check=g.getByRole('button',{name:'동기화 테스트 할 일 완료 취소'});await check.evaluate(button=>button.disabled=false);await check.click();assert.equal(writes,2);
- await a.getByRole('button',{name:'하객 관리',exact:true}).click();await a.getByRole('button',{name:'하객 추가'}).click();await a.getByLabel('이름',{exact:true}).fill('동기화 친구');await a.getByRole('button',{name:'저장하기'}).click();
- await g.getByRole('button',{name:'하객 관리',exact:true}).click();await expect(g.getByText('동기화 친구',{exact:true})).toBeVisible();
- await a.getByLabel('동기화 친구 참석 여부').selectOption('참석');await expect(g.getByText('참석',{exact:true})).toBeVisible();assert.equal(row.data.guests[0].status,'참석');
- await a.getByRole('button',{name:'예산 관리',exact:true}).click();await g.getByRole('button',{name:'예산 관리',exact:true}).click();
- await a.getByRole('button',{name:'예산 항목 추가'}).click();await a.getByLabel('예산 항목',{exact:true}).fill('동기화 웨딩홀');await a.getByLabel('계획 금액 (원)',{exact:true}).fill('1000000');await a.getByLabel('계약·확정 금액 (원)').fill('1200000');await a.getByRole('button',{name:'예산 항목 저장'}).click();
- await expect(g.getByRole('button',{name:'동기화 웨딩홀',exact:true})).toBeVisible();
- await a.getByRole('button',{name:'동기화 웨딩홀 결제 기록 추가'}).click();await a.getByLabel('결제 금액 (원)').fill('200000');await a.getByRole('button',{name:'결제 기록 저장'}).click();
- await expect(g.locator('.budget-summary-grid article').nth(2)).toContainText('200,000');await expect(g.locator('.budget-summary-grid article').nth(3)).toContainText('1,000,000');
- await a.getByRole('button',{name:'동기화 웨딩홀 항목 수정'}).click();await a.getByLabel('계약·확정 금액 (원)').fill('1500000');await a.getByRole('button',{name:'예산 항목 저장'}).click();
- await expect(g.locator('.budget-summary-grid article').nth(3)).toContainText('1,300,000');assert.equal(row.data.expenses[0].payments[0].amount,200000);assert.equal(row.data.expenses[0].actualAmount,1500000);await expect(g.getByRole('button',{name:/항목 수정|결제 기록 추가/})).toHaveCount(0);
- const weddingPayments=structuredClone(row.data.expenses[0].payments);
- const homeName='동기화 원목 식탁',homeBudgetTitle=`주방·다이닝 · ${homeName}`;
+ const admin=await context('admin'),otherAdmin=await context('other-admin'),guest=await context('guest'),direct=await context('direct');
+ const a=await admin.newPage(),b=await otherAdmin.newPage(),g=await guest.newPage(),d=await direct.newPage();
+ await g.goto(url);await g.getByRole('button',{name:'게스트로 보기',exact:true}).click();await expectPublic(g);
+ await d.goto(url+'/?invite=1');await expectPublic(d);
+ assert.equal(requests.filter(request=>['guest','direct'].includes(request.label)&&privatePath(request)).length,0,'Public entry must never read or subscribe to private planning records');
+ await login(a);await login(b);
+
+ // A forced compare-and-swap conflict stands for a concurrent device update.
+ injectConflict=true;
+ await a.getByRole('button',{name:'체크리스트',exact:true}).click();await b.getByRole('button',{name:'체크리스트',exact:true}).click();
+ await a.getByRole('button',{name:'할 일 추가',exact:true}).click();await a.getByLabel('할 일',{exact:true}).fill('비공개 준비 할 일');await a.getByRole('button',{name:'저장하기'}).click();
+ await expect(b.getByText('비공개 준비 할 일',{exact:true})).toBeVisible();await expect(b.getByText('비공개 동시 수정 보존',{exact:true})).toBeVisible();
+ await a.getByRole('button',{name:'비공개 준비 할 일 완료',exact:true}).click();await expect(b.getByRole('button',{name:'비공개 준비 할 일 완료 취소',exact:true})).toBeVisible();
+ assert.ok(conflicts>=1);assert.equal(row.data.tasks.length,2);
+ await a.getByRole('button',{name:'하객 관리',exact:true}).click();await a.getByRole('button',{name:'하객 추가'}).click();await a.getByLabel('이름',{exact:true}).fill('비공개 하객');await a.getByRole('button',{name:'저장하기'}).click();
+ await a.getByLabel('비공개 하객 참석 여부').selectOption('참석');await expect.poll(()=>row.data.guests[0]?.status).toBe('참석');
+
+ await a.getByRole('button',{name:'예산 관리',exact:true}).click();await b.getByRole('button',{name:'예산 관리',exact:true}).click();
+ await a.getByRole('button',{name:'예산 항목 추가'}).click();await a.getByLabel('예산 항목',{exact:true}).fill('비공개 웨딩홀');await a.getByLabel('계획 금액 (원)',{exact:true}).fill('1000000');await a.getByLabel('계약·확정 금액 (원)').fill('1200000');await a.getByRole('button',{name:'예산 항목 저장'}).click();
+ await expect(b.getByRole('button',{name:'비공개 웨딩홀',exact:true})).toBeVisible();
+ await a.getByRole('button',{name:'비공개 웨딩홀 결제 기록 추가'}).click();await a.getByLabel('결제 금액 (원)').fill('200000');await a.getByRole('button',{name:'결제 기록 저장'}).click();
+ await a.getByRole('button',{name:'비공개 웨딩홀 항목 수정'}).click();await a.getByLabel('계약·확정 금액 (원)').fill('1500000');await a.getByRole('button',{name:'예산 항목 저장'}).click();
+ await expect(b.locator('.budget-summary-grid article').nth(3)).toContainText('1,300,000');
+ const weddingPayments=structuredClone(row.data.expenses[0].payments);assert.equal(weddingPayments[0].amount,200000);
+
  await a.getByRole('button',{name:'신혼집 꾸미기',exact:true}).click();
- await g.getByRole('button',{name:'신혼집 꾸미기',exact:true}).click();
- await expect(g.getByRole('button',{name:'꾸미기 항목 추가',exact:true})).toHaveCount(0);
- await expect(g.getByRole('button',{name:'꾸미기 예산 설정',exact:true})).toHaveCount(0);
- await a.getByRole('button',{name:'꾸미기 예산 설정',exact:true}).click();
- await a.getByLabel('꾸미기 예산 (원)',{exact:true}).fill('3000000');
- await a.getByRole('button',{name:'꾸미기 예산 저장',exact:true}).click();
- await expect(g.locator('.home-summary article').nth(0)).toContainText('3,000,000');
+ await a.getByRole('button',{name:'꾸미기 예산 설정',exact:true}).click();await a.getByLabel('꾸미기 예산 (원)',{exact:true}).fill('3000000');await a.getByRole('button',{name:'꾸미기 예산 저장',exact:true}).click();
  await a.getByRole('button',{name:'꾸미기 항목 추가',exact:true}).click();
- await a.getByLabel('품목명',{exact:true}).fill(homeName);
- await a.getByLabel('방·공간',{exact:true}).fill('주방·다이닝');
- await a.getByLabel('계획 단가 (원)',{exact:true}).fill('400000');
- await a.getByLabel('실구매 단가 (원)',{exact:true}).fill('450000');
- await a.getByLabel('수량',{exact:true}).fill('2');
- await a.getByLabel('가로 (cm)',{exact:true}).fill('160');
- await a.getByLabel('깊이 (cm)',{exact:true}).fill('80');
- await a.getByLabel('높이 (cm)',{exact:true}).fill('75');
- await a.getByLabel('색상',{exact:true}).fill('오크');
- await a.getByLabel('소재',{exact:true}).fill('원목');
- await a.getByLabel('배치 위치',{exact:true}).fill('주방 창가');
- await a.getByLabel('상품 링크',{exact:true}).fill('https://example.com/table');
- await a.getByLabel('배송·설치 예정일',{exact:true}).fill('2027-04-10');
- await a.getByLabel('메모',{exact:true}).fill('반입 동선 실측 완료');
+ for(const [label,value] of [['품목명','비공개 원목 식탁'],['방·공간','주방·다이닝'],['계획 단가 (원)','400000'],['실구매 단가 (원)','450000'],['수량','2'],['가로 (cm)','160'],['깊이 (cm)','80'],['높이 (cm)','75'],['색상','오크'],['소재','원목'],['배치 위치','주방 창가'],['상품 링크','https://example.com/table'],['배송·설치 예정일','2027-04-10'],['메모','비공개 반입 동선']])await a.getByLabel(label,{exact:true}).fill(value);
  await a.getByRole('button',{name:'꾸미기 항목 저장',exact:true}).click();
- const adminHomeCard=a.locator('.home-item-card').filter({has:a.getByRole('heading',{name:homeName,exact:true})});
- const guestHomeCard=g.locator('.home-item-card').filter({has:g.getByRole('heading',{name:homeName,exact:true})});
- await expect(guestHomeCard).toContainText('900,000');
- await expect(guestHomeCard).toContainText('가로 160 · 깊이 80 · 높이 75');
- await expect(guestHomeCard.getByRole('link',{name:/제품 보기/})).toHaveAttribute('href','https://example.com/table');
- await expect(g.getByLabel(`${homeName} 준비 상태`,{exact:true})).toHaveCount(0);
- await expect(g.getByRole('button',{name:`${homeName} 수정`,exact:true})).toHaveCount(0);
- await expect(g.getByRole('button',{name:`${homeName} 삭제`,exact:true})).toHaveCount(0);
- await expect(guestHomeCard.getByRole('button',{name:'예산에 연결',exact:true})).toHaveCount(0);
- assert.equal(row.data.expenses.length,1);
- await a.getByLabel(`${homeName} 준비 상태`,{exact:true}).selectOption('배송 중');
- await expect(guestHomeCard.getByText('배송 중',{exact:true})).toBeVisible();
- assert.equal(row.data.home.items[0].status,'배송 중');
- const beforeGuestRead=writes;
- await g.getByLabel('꾸미기 품목 검색',{exact:true}).fill('원목');
- await g.getByLabel('꾸미기 상태 필터',{exact:true}).selectOption('배송 중');
- await expect(guestHomeCard).toBeVisible();assert.equal(writes,beforeGuestRead);
- await adminHomeCard.getByRole('button',{name:'예산에 연결',exact:true}).click();
- const linkDialog=a.getByRole('dialog',{name:'결혼 예산에 반영',exact:true});
- await expect(linkDialog).toContainText('900,000');
- assert.equal(row.data.expenses.length,1);
- await linkDialog.getByRole('button',{name:'예산에 연결하기',exact:true}).click();
- await expect(linkDialog).toHaveCount(0);
- await expect(guestHomeCard.getByRole('button',{name:'예산에서 보기',exact:true})).toBeVisible();
- const homeItemId=row.data.home.items[0].id,homeExpenseId=row.data.home.items[0].expenseId;
- assert.equal(homeExpenseId,`home-${homeItemId}`);assert.equal(row.data.expenses.length,2);
- assert.deepEqual(row.data.expenses[0].payments,weddingPayments);
- assert.deepEqual(row.data.expenses.find(item=>item.id===homeExpenseId).payments,[]);
- await adminHomeCard.getByRole('button',{name:'예산에서 보기',exact:true}).click();
- await guestHomeCard.getByRole('button',{name:'예산에서 보기',exact:true}).click();
- await a.getByRole('button',{name:`${homeBudgetTitle} 항목 수정`,exact:true}).click();
- await a.getByLabel('업체',{exact:true}).fill('동기화 가구점');
- await a.getByLabel('잔금 결제일',{exact:true}).fill('2027-04-08');
- await a.getByLabel(/^메모/).fill('배송료 포함');
- await a.getByRole('button',{name:'예산 항목 저장',exact:true}).click();
- await a.getByRole('button',{name:`${homeBudgetTitle} 결제 기록 추가`,exact:true}).click();
- await a.getByLabel('결제명',{exact:true}).fill('식탁 계약금');
- await a.getByLabel('결제 금액 (원)',{exact:true}).fill('200000');
- await a.getByRole('button',{name:'결제 기록 저장',exact:true}).click();
- await expect(g.locator('.budget-summary-grid article').nth(2)).toContainText('400,000');
- const homePayments=structuredClone(row.data.expenses.find(item=>item.id===homeExpenseId).payments);
- await a.getByRole('button',{name:'신혼집 꾸미기',exact:true}).click();
- await g.getByRole('button',{name:'신혼집 꾸미기',exact:true}).click();
- await a.getByRole('button',{name:`${homeName} 수정`,exact:true}).click();
- await a.getByLabel('실구매 단가 (원)',{exact:true}).fill('500000');
- await a.getByRole('button',{name:'꾸미기 항목 저장',exact:true}).click();
- await expect(guestHomeCard).toContainText('1,000,000');
- assert.equal(row.data.expenses.find(item=>item.id===homeExpenseId).actualAmount,900000);
- for(let reflection=0;reflection<2;reflection++){
-  await adminHomeCard.getByRole('button',{name:'예산 반영',exact:true}).click();
-  await linkDialog.getByRole('button',{name:'예산에 반영하기',exact:true}).click();
-  await expect(linkDialog).toHaveCount(0);
-  assert.equal(row.data.expenses.length,2);
-  const linked=row.data.expenses.find(item=>item.id===homeExpenseId);
-  assert.equal(linked.homeItemId,homeItemId);assert.equal(linked.actualAmount,1000000);
-  assert.equal(linked.vendor,'동기화 가구점');assert.equal(linked.dueDate,'2027-04-08');assert.equal(linked.notes,'배송료 포함');
-  assert.deepEqual(linked.payments,homePayments);assert.deepEqual(row.data.expenses[0].payments,weddingPayments);
- }
- await a.getByRole('button',{name:'공간 관리',exact:true}).click();
- await a.getByLabel('새 공간 이름',{exact:true}).fill('드레스룸');await a.getByRole('button',{name:'공간 추가',exact:true}).click();
- await expect(g.locator('.home-room-tabs').getByRole('button',{name:'드레스룸 0',exact:true})).toBeVisible();
- await a.getByRole('button',{name:'드레스룸 이름 변경',exact:true}).click();await a.getByLabel('공간 이름',{exact:true}).fill('수납방');await a.getByRole('button',{name:'공간 이름 저장',exact:true}).click();
- await expect(g.locator('.home-room-tabs').getByRole('button',{name:'수납방 0',exact:true})).toBeVisible();
- await expect(g.locator('.home-room-tabs').getByRole('button',{name:'드레스룸 0',exact:true})).toHaveCount(0);
- await a.getByRole('button',{name:'주방·다이닝 이름 변경',exact:true}).click();await a.getByLabel('공간 이름',{exact:true}).fill('다이닝룸');await a.getByRole('button',{name:'공간 이름 저장',exact:true}).click();
- await expect(guestHomeCard).toContainText('다이닝룸 · 가구');
- await expect(g.getByRole('button',{name:'공간 관리',exact:true})).toHaveCount(0);
- const roomRenamedExpense=row.data.expenses.find(item=>item.id===homeExpenseId);
- assert.equal(roomRenamedExpense.title,`다이닝룸 · ${homeName}`);assert.equal(roomRenamedExpense.actualAmount,1000000);
- assert.deepEqual(roomRenamedExpense.payments,homePayments);assert.deepEqual(row.data.expenses[0].payments,weddingPayments);
- await a.getByRole('dialog').getByRole('button',{name:'닫기',exact:true}).click();
- const persistedHome=structuredClone(row.data.home);
- for(const page of [a,g])await page.reload();
- await expect(a.locator('.role-badge')).toHaveText('송윤오 · 관리자');
- await expect(g.locator('.role-badge')).toHaveText('게스트 · 읽기 전용');
- for(const page of [a,g])await page.getByRole('button',{name:'신혼집 꾸미기',exact:true}).click();
- await expect(adminHomeCard).toContainText('1,000,000');await expect(guestHomeCard.getByText('배송 중',{exact:true})).toBeVisible();
- assert.deepEqual(row.data.home,persistedHome);assert.equal(row.data.tasks[0].done,true);
- const tripName='동기화 우붓 숙소',packingName='여행용 어댑터';
- for(const page of [a,g])await page.getByRole('button',{name:'신혼여행',exact:true}).click();
- await expect(g.getByRole('button',{name:'여행 설정',exact:true})).toHaveCount(0);
- await expect(g.getByRole('button',{name:'예약 항목 추가',exact:true})).toHaveCount(0);
- const beforeTripRead=writes;
- await g.getByRole('tab',{name:'예약 관리',exact:true}).click();
- await g.getByLabel('여행 예약 검색',{exact:true}).fill('우붓');
- assert.equal(writes,beforeTripRead);
- assert.equal(Object.hasOwn(row.data,'honeymoon'),false);
- await a.getByRole('button',{name:'여행 설정',exact:true}).click();
- await a.getByLabel('여행 시작일',{exact:true}).fill('2027-04-12');
- await a.getByLabel('여행 종료일',{exact:true}).fill('2027-04-20');
- await a.getByLabel('신혼여행 예산 (원)',{exact:true}).fill('7000000');
- await a.getByLabel('여행 메모',{exact:true}).fill('우붓과 해변에서 둘만의 시간');
- await a.getByRole('button',{name:'여행 설정 저장',exact:true}).click();
- await expect(g.locator('.honeymoon-summary article').nth(0)).toContainText('8박 9일');
- await expect(g.locator('.honeymoon-summary article').nth(1)).toContainText('7,000,000');
- await expect(g.getByText('우붓과 해변에서 둘만의 시간',{exact:true})).toBeVisible();
- await a.getByRole('button',{name:'예약 항목 추가',exact:true}).click();
- await a.getByLabel('예약·일정 이름',{exact:true}).fill(tripName);
- await a.getByRole('dialog').getByRole('combobox',{name:/^여행 분류/}).selectOption('숙소');
- await a.getByLabel('여행 지역',{exact:true}).fill('우붓');
- await a.getByLabel('일정 날짜',{exact:true}).fill('2027-04-12');
- await a.getByLabel('시작 시간',{exact:true}).fill('15:00');
- await a.getByLabel('종료 날짜',{exact:true}).fill('2027-04-15');
- await a.getByLabel('계획 금액 (원)',{exact:true}).fill('900000');
- await a.getByLabel('확정 금액 (원)',{exact:true}).fill('850000');
- await a.getByLabel('업체·숙소',{exact:true}).fill('동기화 숙소 업체');
- await a.getByLabel('예약 링크',{exact:true}).fill('https://example.com/ubud');
- await a.getByLabel('예약 메모',{exact:true}).fill('조식 포함, 원화 확정 금액');
- await expect(a.getByLabel('예약 번호',{exact:true})).toHaveCount(0);
+ const homeCard=a.locator('.home-item-card').filter({has:a.getByRole('heading',{name:'비공개 원목 식탁',exact:true})});
+ await expect(homeCard).toContainText('900,000');await a.getByLabel('비공개 원목 식탁 준비 상태',{exact:true}).selectOption('배송 중');
+ await homeCard.getByRole('button',{name:'예산에 연결',exact:true}).click();await a.getByRole('dialog',{name:'결혼 예산에 반영',exact:true}).getByRole('button',{name:'예산에 연결하기',exact:true}).click();
+ await expect(a.getByRole('dialog',{name:'결혼 예산에 반영',exact:true})).toHaveCount(0);
+ await expect.poll(()=>row.data.expenses.length).toBe(2);
+ const homeExpenseId=row.data.home.items[0].expenseId;assert.equal(row.data.expenses.length,2);assert.equal(row.data.expenses.find(item=>item.id===homeExpenseId).actualAmount,900000);
+ await b.getByRole('button',{name:'신혼집 꾸미기',exact:true}).click();await expect(b.locator('.home-item-card')).toContainText('배송 중');
+
+ await a.getByRole('button',{name:'신혼여행',exact:true}).click();await a.getByRole('button',{name:'여행 설정',exact:true}).click();
+ for(const [label,value] of [['여행 시작일','2027-04-18'],['여행 종료일','2027-04-26'],['신혼여행 예산 (원)','7000000'],['여행 메모','비공개 둘만의 여행 메모']])await a.getByLabel(label,{exact:true}).fill(value);
+ await a.getByRole('button',{name:'여행 설정 저장',exact:true}).click();await a.getByRole('button',{name:'예약 항목 추가',exact:true}).click();
+ await a.getByLabel('예약·일정 이름',{exact:true}).fill('비공개 우붓 숙소');await a.getByRole('dialog').getByRole('combobox',{name:/^여행 분류/}).selectOption('숙소');
+ for(const [label,value] of [['여행 지역','우붓'],['일정 날짜','2027-04-18'],['시작 시간','15:00'],['종료 날짜','2027-04-21'],['계획 금액 (원)','900000'],['확정 금액 (원)','850000'],['업체·숙소','비공개 숙소 업체'],['예약 링크','https://example.com/ubud'],['예약 메모','비공개 조식 포함']])await a.getByLabel(label,{exact:true}).fill(value);
  await a.getByRole('button',{name:'예약 항목 저장',exact:true}).click();
- const adminTripCard=a.locator('.honeymoon-item-card').filter({has:a.getByRole('heading',{name:tripName,exact:true})});
- const guestTripCard=g.locator('.honeymoon-item-card').filter({has:g.getByRole('heading',{name:tripName,exact:true})});
- await expect(guestTripCard).toContainText('850,000');
- await expect(guestTripCard).toContainText('2027-04-12 → 2027-04-15 · 15:00');
- await expect(guestTripCard.getByRole('link',{name:/예약 링크/})).toHaveAttribute('href','https://example.com/ubud');
- assert.equal(row.data.expenses.length,2);
- await a.getByLabel(`${tripName} 예약 상태`,{exact:true}).selectOption('예약 완료');
- await expect(guestTripCard.getByText('예약 완료',{exact:true})).toBeVisible();
- await expect(g.getByLabel(`${tripName} 예약 상태`,{exact:true})).toHaveCount(0);
- await expect(guestTripCard.getByRole('button',{name:'예산에 연결',exact:true})).toHaveCount(0);
- await expect(g.getByRole('button',{name:`${tripName} 수정`,exact:true})).toHaveCount(0);
- await expect(g.getByRole('button',{name:`${tripName} 삭제`,exact:true})).toHaveCount(0);
- await adminTripCard.getByRole('button',{name:'예산에 연결',exact:true}).click();
- const tripLinkDialog=a.getByRole('dialog',{name:'결혼 예산에 반영',exact:true});
- await expect(tripLinkDialog).toContainText('850,000');
- assert.equal(row.data.expenses.length,2);
- await tripLinkDialog.getByRole('button',{name:'예산에 연결하기',exact:true}).click();
- await expect(tripLinkDialog).toHaveCount(0);
- const tripItemId=row.data.honeymoon.items[0].id,tripExpenseId=row.data.honeymoon.items[0].expenseId;
- assert.equal(tripExpenseId,`trip-${tripItemId}`);
- assert.equal(row.data.expenses.length,3);
- assert.deepEqual(row.data.expenses.find(item=>item.id===tripExpenseId).payments,[]);
- await expect(guestTripCard.getByRole('button',{name:'예산에서 보기',exact:true})).toBeVisible();
- await a.getByRole('button',{name:`${tripName} 수정`,exact:true}).click();
- await a.getByLabel('확정 금액 (원)',{exact:true}).fill('950000');
- await a.getByRole('button',{name:'예약 항목 저장',exact:true}).click();
- await expect(guestTripCard).toContainText('950,000');
- assert.equal(row.data.expenses.find(item=>item.id===tripExpenseId).actualAmount,850000);
- for(let reflection=0;reflection<2;reflection++){
-  await adminTripCard.getByRole('button',{name:'예산 반영',exact:true}).click();
-  await tripLinkDialog.getByRole('button',{name:'예산에 반영하기',exact:true}).click();
-  await expect(tripLinkDialog).toHaveCount(0);
-  assert.equal(row.data.expenses.length,3);
-  const linked=row.data.expenses.find(item=>item.id===tripExpenseId);
-  assert.equal(linked.honeymoonItemId,tripItemId);assert.equal(linked.actualAmount,950000);
-  assert.deepEqual(linked.payments,[]);
-  assert.deepEqual(row.data.expenses.find(item=>item.id===homeExpenseId).payments,homePayments);
-  assert.deepEqual(row.data.expenses[0].payments,weddingPayments);
- }
- await g.getByRole('tab',{name:'여행 일정',exact:true}).click();
- await expect(g.locator('.honeymoon-day-heading')).toContainText('2027-04-12');
- await expect(g.locator('.honeymoon-day-heading')).toContainText('여행 1일차');
- for(const page of [a,g])await page.getByRole('tab',{name:/^준비물/}).click();
- await expect(g.getByRole('button',{name:'준비물 추가',exact:true})).toHaveCount(0);
- await expect(g.getByRole('button',{name:'기본 준비물 불러오기',exact:true})).toHaveCount(0);
- await a.getByRole('button',{name:'준비물 추가',exact:true}).click();
- await a.getByLabel('준비물 이름',{exact:true}).fill(packingName);
- await a.getByRole('button',{name:'준비물 저장',exact:true}).click();
- const guestPacking=g.locator('.honeymoon-packing-list li').filter({hasText:packingName});
- await expect(guestPacking).toContainText('준비 중');
- await a.getByRole('checkbox',{name:packingName,exact:true}).click();
- await expect(a.getByRole('checkbox',{name:packingName,exact:true})).toBeChecked();
- await expect(guestPacking).toContainText('준비 완료');
- await expect(g.getByRole('checkbox',{name:packingName,exact:true})).toHaveCount(0);
- await expect(g.getByRole('button',{name:`${packingName} 준비물 수정`,exact:true})).toHaveCount(0);
- await expect(g.getByRole('button',{name:`${packingName} 준비물 삭제`,exact:true})).toHaveCount(0);
- const persistedTrip=structuredClone(row.data.honeymoon),beforeTripReload=writes;
- for(const page of [a,g])await page.reload();
- await expect(a.locator('.role-badge')).toHaveText('송윤오 · 관리자');
- await expect(g.locator('.role-badge')).toHaveText('게스트 · 읽기 전용');
- for(const page of [a,g])await page.getByRole('button',{name:'신혼여행',exact:true}).click();
- await expect(adminTripCard).toContainText('950,000');
- await expect(guestTripCard.getByText('예약 완료',{exact:true})).toBeVisible();
- await expect(g.locator('.honeymoon-summary article').nth(0)).toContainText('8박 9일');
- for(const page of [a,g])await page.getByRole('tab',{name:/^준비물/}).click();
- await expect(guestPacking).toContainText('준비 완료');
- await expect(a.getByRole('checkbox',{name:packingName,exact:true})).toBeChecked();
- assert.deepEqual(row.data.honeymoon,persistedTrip);assert.deepEqual(row.data.home,persistedHome);
- assert.equal(row.data.expenses.length,3);assert.equal(writes,beforeTripReload);assert.deepEqual(errors,[]);
- console.log('Mock cloud browser passed: email flow, two-device realtime, detailed budgets, home and Bali honeymoon planning, reservations and packing, explicit idempotent budget links, preserved payments, shared persistence and guest write guard. Live Supabase read-only validation still required.');
-}finally{await browser.close();await new Promise(resolve=>server.close(resolve))}
+ const tripCard=a.locator('.honeymoon-item-card').filter({has:a.getByRole('heading',{name:'비공개 우붓 숙소',exact:true})});
+ await a.getByLabel('비공개 우붓 숙소 예약 상태',{exact:true}).selectOption('예약 완료');await tripCard.getByRole('button',{name:'예산에 연결',exact:true}).click();await a.getByRole('dialog',{name:'결혼 예산에 반영',exact:true}).getByRole('button',{name:'예산에 연결하기',exact:true}).click();
+ await expect(a.getByRole('dialog',{name:'결혼 예산에 반영',exact:true})).toHaveCount(0);
+ await a.getByRole('tab',{name:/^준비물/}).click();await a.getByRole('button',{name:'준비물 추가',exact:true}).click();await a.getByLabel('준비물 이름',{exact:true}).fill('여행용 어댑터');await a.getByRole('button',{name:'준비물 저장',exact:true}).click();await a.getByRole('checkbox',{name:'여행용 어댑터',exact:true}).click();
+ await expect.poll(()=>row.data.honeymoon.packing[0]?.done).toBe(true);assert.equal(row.data.expenses.length,3);assert.deepEqual(row.data.expenses[0].payments,weddingPayments);
+
+ // Upload is a draft operation; only the explicit save publishes card settings.
+ await a.getByRole('button',{name:'모바일 청첩장',exact:true}).click();
+ const beforeInvitation=writes;
+ for(const [label,value] of [['신랑 이름','윤오'],['신부 이름','예은'],['예식 날짜','2027-05-22'],['예식 시간','13:30'],['초대 글','우리의 새로운 시작에 함께해 주세요.'],['추가 교통 안내','지하철 평촌역에서 만나 뵙겠습니다.'],['신랑 연락처','010-1234-5678'],['신부 연락처','010-2345-6789']])await a.getByLabel(label,{exact:true}).fill(value);
+ await a.getByLabel('대표 사진 업로드',{exact:true}).setInputFiles('app/src/assets/venue/briller-hall.webp');
+ await expect(a.getByLabel('대표 사진 설명',{exact:true})).toBeVisible();await a.getByLabel('대표 사진 설명',{exact:true}).fill('공개 초대장 대표 사진');
+ assert.equal(writes,beforeInvitation);assert.equal(storage.size,1);
+ await a.getByRole('button',{name:'청첩장 저장',exact:true}).click();
+ await expect.poll(()=>row.data.invitation?.groom).toBe('윤오');assert.equal(row.data.date,'2027-05-22');assert.equal(row.data.invitation.time,'13:30');
+ assert.match(row.data.invitation.heroPhoto.url,/\/storage\/v1\/object\/public\/wedding-invitation\/hero\/.+\.jpg$/);
+ await expect(g.locator('.invitation-paper')).toContainText('우리의 새로운 시작에 함께해 주세요.');
+ await expect(g.locator('.invitation-paper')).toContainText('오후 1시 30분');await expectPublic(g);
+ for(const page of [g,d]){await page.reload();await expectPublic(page);await expect(page.locator('.invitation-paper')).toContainText('우리의 새로운 시작에 함께해 주세요.')}
+ await g.setViewportSize({width:390,height:844});await g.screenshot({path:'/tmp/our-chapter-cloud-invitation-mobile.png',fullPage:true});
+ await expect.poll(()=>g.locator('.invitation-paper img').first().evaluate(image=>image.complete&&image.naturalWidth>0)).toBe(true);
+ assert.equal(await g.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ const publicReads=requests.filter(request=>['guest','direct'].includes(request.label)&&request.path==='/rest/v1/wedding_invitation');assert.ok(publicReads.length>=4);
+ assert.ok(publicResponses.every(validInvitation));for(const published of publicResponses)assert.equal(JSON.stringify(published).includes('비공개'),false);
+ assert.equal(requests.filter(request=>['guest','direct'].includes(request.label)&&privatePath(request)&&!request.probe).length,0);
+
+ // A forged browser request still receives a server-side denial in this fixture.
+ const denied=await g.evaluate(async()=>{
+  const headers={'content-type':'application/json',apikey:'sb_publishable_test','x-security-probe':'1'};
+  const read=await fetch('https://sync-test.supabase.co/rest/v1/wedding_state?select=*',{headers});
+  const write=await fetch('https://sync-test.supabase.co/rest/v1/rpc/save_wedding_state',{method:'POST',headers,body:JSON.stringify({_expected_revision:0,_new_data:{budget:1}})});
+  return {read:read.status,write:write.status};
+ });assert.deepEqual(denied,{read:403,write:403});
+
+ // A private request that finishes after logout must not restore the dashboard.
+ await a.getByRole('button',{name:'체크리스트',exact:true}).click();await a.getByRole('button',{name:'할 일 추가',exact:true}).click();await a.getByLabel('할 일',{exact:true}).fill('비공개 로그아웃 대기 기록');
+ holdNextWrite=true;await a.getByRole('button',{name:'저장하기'}).click();await expect.poll(()=>typeof releaseWrite).toBe('function');await a.keyboard.press('Escape');await a.getByRole('button',{name:'접속 화면으로 돌아가기',exact:true}).click();
+ await expect(a.getByRole('button',{name:'게스트로 보기',exact:true})).toBeVisible();releaseWrite();releaseWrite=null;
+ await a.getByRole('button',{name:'게스트로 보기',exact:true}).click();await expectPublic(a);await expect(a.locator('body')).not.toContainText('비공개 로그아웃 대기 기록');
+ assert.deepEqual(errors,[]);
+ console.log('Mock cloud browser passed: verified private admin access, two-device realtime, conflict retry, budgets/payments, home and Bali records, separate public invitation, draft photo upload and explicit publication, guest privacy, anonymous denial and logout callback guard. Production RLS still requires separate validation.');
+}finally{releaseWrite?.();await browser.close();await new Promise(resolve=>server.close(resolve))}

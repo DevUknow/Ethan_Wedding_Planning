@@ -6,6 +6,9 @@ import AccessGate from './AccessGate';
 import BudgetPlanner from './BudgetPlanner';
 import HomePlanner from './HomePlanner';
 import HoneymoonPlanner from './HoneymoonPlanner';
+import Invitation from './Invitation';
+import InvitationEditor from './InvitationEditor';
+import {toPublicInvitation,validInvitation} from './invitation-model';
 import {budgetSummary} from './budget-model';
 import {VenuePreview,VenueDetails} from './Venue';
 import {venue} from './venue';
@@ -17,45 +20,81 @@ import './style.css';
 const STORAGE='our-chapter-v1';
 const cloud=createCloudServices();
 const editable=person=>isAdministrator(person)&&(!cloud||person.cloud===true);
-const nav=[['overview','대시보드',LayoutDashboard],['tasks','체크리스트',CheckSquare],['budget','예산 관리',Wallet],['guests','하객 관리',Users],['timeline','우리의 일정',CalendarDays],['venue','웨딩홀 소개',MapPin],['home','신혼집 꾸미기',House],['honeymoon','신혼여행',Plane]];
+const nav=[['overview','대시보드',LayoutDashboard],['tasks','체크리스트',CheckSquare],['budget','예산 관리',Wallet],['guests','하객 관리',Users],['timeline','우리의 일정',CalendarDays],['venue','웨딩홀 소개',MapPin],['home','신혼집 꾸미기',House],['honeymoon','신혼여행',Plane],['invitation','모바일 청첩장',Heart]];
 const money=n=>new Intl.NumberFormat('ko-KR').format(n);
 function App(){
- const [session,setSession]=useState(()=>{const saved=readAccess();return cloud?(saved?.role==='guest'?saved:null):saved});
+ const [session,setSession]=useState(()=>{if(new URLSearchParams(location.search).get('invite')==='1')return {role:'guest',name:'게스트'};const saved=readAccess();return cloud?(saved?.role==='guest'?saved:null):saved});
  const sessionRef=useRef(session);sessionRef.current=session;
- const canEdit=editable(session);
+ const canEdit=editable(session),isGuest=session?.role==='guest';
  const [cloudReady,setCloudReady]=useState(!cloud),[cloudStatus,setCloudStatus]=useState('connecting'),[cloudError,setCloudError]=useState('');
- const syncRef=useRef(null),authSuppressed=useRef(false);
+ const [publicInvitation,setPublicInvitation]=useState(null),[publicReady,setPublicReady]=useState(!cloud),[publicError,setPublicError]=useState(''),[publicRetry,setPublicRetry]=useState(0);
+ const syncRef=useRef(null),authSuppressed=useRef(isGuest);
  const [localImport,setLocalImport]=useState(()=>{try{const stored=JSON.parse(localStorage.getItem(STORAGE));return cloud&&validBackup(stored)?upgradeData(stored):null}catch{return null}});
- async function enter(person){
-   if(cloud&&person.role==='guest'){authSuppressed.current=true;try{await cloud.signOut()}catch{}}
-   if(person.cloud)authSuppressed.current=false;
-   sessionRef.current=person;saveAccess(person);setSession(person);
- }
- function leave(){authSuppressed.current=true;if(cloud?.signOut)void cloud.signOut().catch(()=>{});sessionRef.current=null;saveAccess(null);setSession(null);setModal(null);setMobile(false);setPage('overview');setFilter('전체');setNotice('')}
- function openModal(kind){if(editable(sessionRef.current))setModal(kind)}
- const [data,setData]=useState(()=>{try {let d=JSON.parse(localStorage.getItem(STORAGE));return validBackup(d)?upgradeData(d):structuredClone(initialData)}catch{return structuredClone(initialData)}});
+ const [data,setData]=useState(()=>{if(cloud)return structuredClone(initialData);try{const d=JSON.parse(localStorage.getItem(STORAGE));return validBackup(d)?upgradeData(d):structuredClone(initialData)}catch{return structuredClone(initialData)}});
  const dataRef=useRef(data);dataRef.current=data;
  const [page,setPage]=useState('overview'),[modal,setModal]=useState(null),[filter,setFilter]=useState('전체'),[mobile,setMobile]=useState(false),[notice,setNotice]=useState('');const importRef=useRef();
+ const invitationUrl=`${location.origin}${location.pathname}?invite=1`;
+ async function enter(person){
+   authSuppressed.current=person.role==='guest';
+   sessionRef.current=person;saveAccess(person);setSession(person);
+   if(cloud&&person.role==='guest'){syncRef.current?.stop();syncRef.current=null;setData(structuredClone(initialData));try{await cloud.signOut()}catch{}}
+ }
+ function leave(){
+   authSuppressed.current=true;syncRef.current?.stop();syncRef.current=null;
+   if(cloud?.signOut)void cloud.signOut().catch(()=>{});
+   sessionRef.current=null;saveAccess(null);setSession(null);setModal(null);setMobile(false);setPage('overview');setFilter('전체');setNotice('');
+   if(cloud){setData(structuredClone(initialData));setCloudReady(false)}
+   const url=new URL(location.href);url.searchParams.delete('invite');history.replaceState(null,'',url.pathname+url.search+url.hash);
+ }
+ function openModal(kind){if(editable(sessionRef.current))setModal(kind)}
  useEffect(()=>{
-   if(!cloud)return;
-   if(cloud.error){setCloudError(cloud.error);return}
+   if(!cloud||cloud.error)return;
    let active=true;
-   const sync=createSynchronizer(cloud,{onData:next=>{if(active){setData(upgradeData(next));setCloudReady(true)}},onStatus:status=>{if(active)setCloudStatus(status)},onError:error=>{if(active){setCloudError(error.message);setNotice('공유 저장소 연결을 확인해 주세요. '+error.message)}}});
-   syncRef.current=sync;
-   void sync.start().catch(()=>{});
-   const apply=person=>{if(!active||authSuppressed.current)return;if(person){sessionRef.current=person;setSession(person)}else if(sessionRef.current?.cloud){sessionRef.current=null;setSession(null);setModal(null)}};
+   const apply=person=>{
+     if(!active||authSuppressed.current)return;
+     if(person){sessionRef.current=person;saveAccess(person);setSession(person)}
+     else if(sessionRef.current?.cloud){syncRef.current?.stop();sessionRef.current=null;saveAccess(null);setSession(null);setModal(null);setData(structuredClone(initialData));setCloudReady(false)}
+   };
    void cloud.getAdministrator().then(apply).catch(()=>{});
-   const stopAuth=cloud.watchAuth(apply);
-   return ()=>{active=false;sync.stop();stopAuth()};
+   const stop=cloud.watchAuth(apply);return()=>{active=false;stop()};
  },[]);
- useEffect(()=>{document.title=`${data.couple} · Our Chapter`},[data.couple]);
+ useEffect(()=>{
+   if(!cloud||!canEdit)return;
+   if(cloud.error){setCloudError(cloud.error);return}
+   let active=true;setCloudReady(false);setCloudError('');
+   const sync=createSynchronizer(cloud,{
+     onData:next=>{if(active&&editable(sessionRef.current)){setData(upgradeData(next));setCloudReady(true)}},
+     onStatus:status=>{if(active)setCloudStatus(status)},
+     onError:error=>{if(active){setCloudError(error.message);setNotice('공유 저장소 연결을 확인해 주세요. '+error.message)}}
+   });
+   syncRef.current=sync;void sync.start().catch(()=>{});
+   return()=>{active=false;sync.stop();if(syncRef.current===sync)syncRef.current=null};
+ },[canEdit,session?.id]);
+ useEffect(()=>{
+   if(!cloud||!isGuest)return;
+   let active=true,revision=-1;setPublicReady(false);setPublicError('');
+   const accept=row=>{
+     if(!active)return;
+     if(!row||!validInvitation(row.data))throw Error('청첩장 정보를 확인하지 못했습니다. 잠시 후 다시 열어 주세요.');
+     if(Number(row.revision)<revision)return;
+     revision=Number(row.revision);setPublicInvitation(row.data);setPublicReady(true);setPublicError('');
+   };
+   const failed=error=>{if(active)setPublicError(error.message||'청첩장을 불러오지 못했습니다.')};
+   if(cloud.error){failed(Error(cloud.error));return()=>{active=false}}
+   const refresh=()=>cloud.readInvitation().then(accept).catch(failed);
+   void refresh();
+   const stop=cloud.listenInvitation(row=>{try{accept(row)}catch(error){failed(error)}},status=>{if(status==='SUBSCRIBED')void refresh()});
+   return()=>{active=false;stop()};
+ },[isGuest,publicRetry]);
+ const invitation=cloud?publicInvitation:toPublicInvitation(data);
+ useEffect(()=>{document.title=isGuest&&invitation?`${invitation.groom} ♥ ${invitation.bride} · 결혼합니다`:`${data.couple} · Our Chapter`},[isGuest,invitation?.groom,invitation?.bride,data.couple]);
  const dialogRef=useRef(null),returnFocus=useRef(null);
  useEffect(()=>{if(!modal)return;returnFocus.current=document.activeElement;const dialog=dialogRef.current;const focusable=()=>[...dialog.querySelectorAll('button,input,select')].filter(el=>!el.disabled);focusable().find(el=>el.tagName==='INPUT')?.focus();function handle(e){if(e.key==='Escape'){setModal(null);return}if(e.key==='Tab'){const list=focusable(),first=list[0],last=list.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}}document.addEventListener('keydown',handle);return()=>{document.removeEventListener('keydown',handle);returnFocus.current?.focus()}},[modal]);
  const stat=totals(data),financial=budgetSummary(data),days=daysUntil(data.date),progress=data.tasks.length?Math.round(stat.completed/data.tasks.length*100):0;
  async function update(fn){
    if(!editable(sessionRef.current))return false;
    const migrateAndUpdate=current=>upgradeData(fn(upgradeData(current)));
-   if(cloud){try{await syncRef.current.change(migrateAndUpdate);return true}catch{return false}}
+   if(cloud){if(!syncRef.current)return false;try{await syncRef.current.change(migrateAndUpdate);return true}catch{return false}}
    const next=migrateAndUpdate(dataRef.current);if(!validBackup(next))throw Error('저장할 기록의 형식이 올바르지 않습니다.');dataRef.current=next;try{localStorage.setItem(STORAGE,JSON.stringify(next))}catch{setNotice('저장 공간을 사용할 수 없습니다. 데이터를 백업해 주세요.')}setData(next);return true;
  }
  async function importLocal(){if(!localImport||!editable(sessionRef.current))return;if(window.confirm('이 브라우저에 있던 준비 기록으로 공유 기록을 교체할까요?')){if(await update(()=>localImport)){setLocalImport(null);setNotice('기존 준비 기록을 공유 저장소에 옮겼습니다.')}}}
@@ -64,8 +103,12 @@ function App(){
  async function submit(e){e.preventDefault();if(!editable(sessionRef.current))return;const f=Object.fromEntries(new FormData(e.target));for(const key of ['title','name','couple']){if(key in f){f[key]=f[key].trim();if(!f[key]){setNotice('빈 이름이나 항목은 저장할 수 없습니다.');return}}}const id=crypto.randomUUID();let saved=false;if(modal==='settings')saved=await update(d=>({...d,couple:f.couple.trim(),date:f.date,budget:Number(f.budget)}));if(modal==='task')saved=await update(d=>({...d,tasks:[...d.tasks,{...f,id,done:false}]}));if(modal==='guest')saved=await update(d=>({...d,guests:[...d.guests,{...f,id}]}));if(saved)setModal(null)}
  function backup(){if(!editable(sessionRef.current))return;const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='our-chapter-backup.json';a.click();URL.revokeObjectURL(url);setNotice('백업 파일을 다운로드했습니다.')}
  async function restore(e){if(!editable(sessionRef.current))return;const file=e.target.files[0];if(!file)return;try{const next=JSON.parse(await file.text());if(!editable(sessionRef.current))return;if(!validBackup(next))throw Error();if(window.confirm('현재 기록을 백업 파일의 내용으로 교체할까요?')){if(await update(()=>next))setNotice('백업을 복원했습니다.')}}catch{setNotice('유효한 Our Chapter 백업 파일이 아닙니다.')}e.target.value=''}
- if(cloud&&!cloudReady)return <main className="sync-loading"><img src={heartIcon} alt="" width="48" height="48"/><h1>{cloudError?'공유 저장소 연결을 확인해 주세요':'함께 준비한 기록을 불러오는 중이에요'}</h1><p>{cloudError||'잠시만 기다려 주세요.'}</p>{cloudError&&syncRef.current&&<button className="primary-button" onClick={()=>{setCloudError('');void syncRef.current.start().catch(()=>{})}}>다시 연결</button>}</main>;
  if(!session)return <AccessGate onEnter={enter} cloud={cloud}/>;
+ if(isGuest){
+   if(cloud&&(!publicReady||!invitation))return <main className="sync-loading"><img src={heartIcon} alt="" width="48" height="48"/><h1>{publicError?'청첩장을 불러오지 못했어요':'소중한 초대를 준비하고 있어요'}</h1><p>{publicError||'잠시만 기다려 주세요.'}</p>{publicError&&<button className="primary-button" onClick={()=>setPublicRetry(value=>value+1)}>다시 불러오기</button>}<button className="text-button" onClick={leave}>관리자 로그인</button></main>;
+   return <Invitation invitation={invitation} onAdminEnter={leave} invitationUrl={invitationUrl}/>;
+ }
+ if(cloud&&!cloudReady)return <main className="sync-loading"><img src={heartIcon} alt="" width="48" height="48"/><h1>{cloudError?'공유 저장소 연결을 확인해 주세요':'함께 준비한 기록을 불러오는 중이에요'}</h1><p>{cloudError||'잠시만 기다려 주세요.'}</p>{cloudError&&syncRef.current&&<button className="primary-button" onClick={()=>{setCloudError('');void syncRef.current.start().catch(()=>{})}}>다시 연결</button>}<button className="text-button" onClick={leave}>접속 화면으로 돌아가기</button></main>;
  function TaskList({limit}){let list=data.tasks.filter(t=>filter==='전체'||(filter==='완료'?t.done:!t.done));if(limit)list=list.filter(t=>!t.done).slice(0,3);return list.length?<div className="task-list">{list.map(t=><div className="task-row" key={t.id}><button disabled={!canEdit} className={'checkbox '+(t.done?'checked':'')} aria-label={`${t.title} ${t.done?'완료 취소':'완료'}`} onClick={()=>update(d=>({...d,tasks:d.tasks.map(x=>x.id===t.id?{...x,done:!x.done}:x)}))}>{t.done&&<Check size={13}/>}</button><div className={t.done?'done':''}><strong>{t.title}</strong><span>{t.due||'날짜 미정'}</span></div><small className="tag">{t.category}</small>{!limit&&canEdit&&<button className="icon-button" aria-label={`${t.title} 삭제`} onClick={()=>remove('tasks',t.id)}><Trash2 size={15}/></button>}</div>)}</div>:<div className="empty"><CheckSquare/> {limit?(canEdit?'지금 할 일을 모두 마쳤어요. 새로운 준비를 추가해 보세요.':'현재 예정된 준비가 없습니다.'):'표시할 할 일이 없습니다.'}</div>}
  return <div className="app"><aside className={mobile?'sidebar open':'sidebar'}><a className="brand" href="#" onClick={e=>{e.preventDefault();go('overview')}}><img className="brand-icon" src={heartIcon} alt="" width="36" height="36"/><div>our chapter<span>WEDDING PLANNER</span></div></a><div className="sidebar-caption">OUR LITTLE BIG DAY</div><nav>{nav.map(([id,label,Icon])=><button key={id} className={page===id?'active':''} onClick={()=>go(id)}><Icon size={19}/>{label}{id==='venue'&&<span className="nav-dot"/>}</button>)}</nav><div className="sidebar-bottom"><div className="together"><Heart size={20}/><p>함께 준비하는<br/><b>우리의 가장 아름다운 날.</b></p><span>ONE STEP AT A TIME</span></div>{canEdit&&<button className="settings-link" onClick={()=>openModal('settings')}><Settings size={17}/> 웨딩 설정</button>}<span className="local-note">{cloud?'기록은 공유 저장소에 저장됩니다':'기록은 이 브라우저에 저장됩니다'}</span></div></aside>{mobile&&<button className="scrim" aria-label="메뉴 닫기" onClick={()=>setMobile(false)}/>}
  <div className="workspace"><header className="topbar"><div><button className="mobile-menu icon-button" aria-label="메뉴 열기" onClick={()=>setMobile(true)}><Menu/></button><span>우리의 결혼 준비</span><span className="crumb">/</span><b>{nav.find(n=>n[0]===page)[1]}</b></div><div className="session-controls">{canEdit?<button className="couple" onClick={()=>openModal('settings')}><span className="avatar"><Heart size={14} fill="currentColor"/></span><span>{data.couple}</span><Settings size={15}/></button>:<div className="couple"><span className="avatar"><Heart size={14} fill="currentColor"/></span><span>{data.couple}</span></div>}<span className="role-badge">{canEdit?`${session.name} · 관리자`:'게스트 · 읽기 전용'}</span><button className="icon-button" aria-label="접속 화면으로 돌아가기" title="접속 화면으로 돌아가기" onClick={leave}><LogOut size={17}/></button></div></header><main>{cloud&&<div className={'sync-banner '+cloudStatus}><span className="sync-dot"/><span>{{connecting:'연결 중…',synced:'공유 기록이 연결되어 있어요',saving:'공유 저장소에 저장 중…',offline:'실시간 연결을 다시 시도하고 있어요',error:'공유 저장소 연결을 확인해 주세요'}[cloudStatus]}</span>{canEdit&&localImport&&<button className="text-button" onClick={importLocal}>기존 브라우저 기록 가져오기</button>}</div>}{!canEdit&&<div className="readonly-banner"><LockKeyhole size={15}/><span>게스트로 보고 있어요. 준비 내용을 자유롭게 둘러보세요.</span></div>}
@@ -73,7 +116,7 @@ function App(){
  <section className="hero"><div className="hero-copy"><div className="eyebrow hero-couple">{data.couple}</div><h2>A day to remember.<br/><i>A lifetime to love.</i></h2><p>우리다운 결혼식, 우리만의 속도로.<br/>가장 아름다운 다음 장을 함께 써 내려가요.</p><button onClick={()=>go('timeline')}>우리의 일정 보기 <ArrowRight size={17}/></button></div><div className="hero-art" aria-hidden="true"><div className="arch"><div className="sun"/><div className="vase"/><div className="stem s1"/><div className="stem s2"/><div className="stem s3"/><div className="bloom b1"/><div className="bloom b2"/><div className="bloom b3"/><div className="leaf l1"/><div className="leaf l2"/><div className="leaf l3"/></div><span className="art-note">a beautiful beginning</span></div><div className="countdown"><Heart size={15}/><span>TO OUR WEDDING</span><strong>{days===null?'D —':days>=0?`D − ${days}`:`D + ${Math.abs(days)}`}</strong><small>{data.date?`${data.date} · 우리의 날`:'우리의 날을 정해 주세요'}</small></div></section>
  <section className="stats"><Stat title="결혼 준비 진행률" icon={CheckSquare} value={`${progress}%`} sub={`${data.tasks.length}개 중 ${stat.completed}개 완료`}><div className="progress-track"><i style={{width:progress+'%'}}/></div></Stat><Stat title="예상 결혼 비용" icon={Wallet} value={`${money(financial.projected)}원`} sub={`결제 완료 ${money(financial.paid)}원 · 총 예산 ${money(data.budget)}원`}><span className={financial.available<0?'over-budget':'stat-foot'}>{financial.available<0?'예산 초과':'예산 여유'} <b>{money(Math.abs(financial.available))}원</b></span></Stat><Stat title="함께할 소중한 사람들" icon={Users} value={`${data.guests.length}명`} sub={`참석 확정 ${stat.confirmed}명`}><span className="stat-foot">소중한 분들을 초대해 보세요 <Heart size={12}/></span></Stat></section>
  <div className="dashboard-grid"><section className="card"><div className="section-heading"><div><h3>지금 준비하면 좋은 일</h3><p>하나씩 체크할 때마다, 한 걸음 더 가까이.</p></div><button className="text-button" onClick={()=>go('tasks')}>전체 보기 <ArrowUpRight size={15}/></button></div><TaskList limit={3}/>{canEdit&&<button className="add-inline" onClick={()=>openModal('task')}><Plus size={16}/> 새로운 할 일 추가</button>}</section><section className="quote-card"><span className="eyebrow">A LITTLE REMINDER</span><Sparkles size={26}/><h3>완벽한 결혼식보다,<br/><i>우리다운 결혼식.</i></h3><p>가장 중요한 건,<br/>그날 함께 웃고 있을 우리니까요.</p><span className="quote-bottom">WITH LOVE, ALWAYS <Heart size={13}/></span></section></div>
- <VenuePreview onOpen={()=>go('venue')}/></>:<><div className="page-heading"><div><div className="eyebrow">OUR WEDDING, OUR WAY</div><h1>{nav.find(n=>n[0]===page)[1]}</h1><p>{{tasks:'작은 할 일부터 하나씩, 함께 완성해요.',budget:'계획과 계약, 계약금과 잔금까지 꼼꼼하게 준비해요.',guests:'우리의 시작을 함께할 사람들을 기억해요.',timeline:'함께 만들어 갈 순간들을 한눈에.',venue:'더파티움 안양 5층 브리에홀, 우리의 시작을 함께할 공간.',home:'하나씩 고르고 채워가는, 우리 둘의 첫 번째 집.',honeymoon:'발리에서 시작하는 둘만의 여행, 하나씩 함께 준비해요.'}[page]}</p></div>{canEdit&&['tasks','guests'].includes(page)&&<button className="primary-button" onClick={()=>openModal({tasks:'task',guests:'guest'}[page])}><Plus size={17}/>{{tasks:'할 일 추가',guests:'하객 추가'}[page]}</button>}</div>
+ <VenuePreview onOpen={()=>go('venue')}/></>:<><div className="page-heading"><div><div className="eyebrow">OUR WEDDING, OUR WAY</div><h1>{nav.find(n=>n[0]===page)[1]}</h1><p>{{tasks:'작은 할 일부터 하나씩, 함께 완성해요.',budget:'계획과 계약, 계약금과 잔금까지 꼼꼼하게 준비해요.',guests:'우리의 시작을 함께할 사람들을 기억해요.',timeline:'함께 만들어 갈 순간들을 한눈에.',venue:'더파티움 안양 5층 브리에홀, 우리의 시작을 함께할 공간.',home:'하나씩 고르고 채워가는, 우리 둘의 첫 번째 집.',honeymoon:'발리에서 시작하는 둘만의 여행, 하나씩 함께 준비해요.',invitation:'소중한 분들에게 전할 우리의 초대를 준비해요.'}[page]}</p></div>{canEdit&&['tasks','guests'].includes(page)&&<button className="primary-button" onClick={()=>openModal({tasks:'task',guests:'guest'}[page])}><Plus size={17}/>{{tasks:'할 일 추가',guests:'하객 추가'}[page]}</button>}</div>
  {page==='tasks'&&<section className="card"><div className="filters">{['전체','진행 중','완료'].map(f=><button className={filter===f?'selected':''} onClick={()=>setFilter(f)} key={f}>{f}</button>)}<span>{stat.completed} / {data.tasks.length} 완료</span></div><TaskList/></section>}
  {page==='budget'&&<BudgetPlanner data={data} canEdit={canEdit} onChange={update} onSettings={()=>openModal('settings')}/> }
  {page==='guests'&&<section className="card"><div className="section-heading"><h3>초대 목록 <span className="tag">{data.guests.length}명</span></h3><span>참석 {stat.confirmed} · 미정 {data.guests.filter(g=>g.status==='미정').length}</span></div>{data.guests.length?<div className="table-wrap"><table><thead><tr><th>이름</th><th>구분</th><th>참석 여부</th><th><span className="sr-only">삭제</span></th></tr></thead><tbody>{data.guests.map(g=><tr key={g.id}><td>{g.name}</td><td>{g.side}</td><td>{canEdit?<select aria-label={`${g.name} 참석 여부`} value={g.status} onChange={e=>{const status=e.currentTarget.value;void update(d=>({...d,guests:d.guests.map(x=>x.id===g.id?{...x,status}:x)}))}}>{['미정','참석','불참'].map(s=><option key={s}>{s}</option>)}</select>:<span className="tag">{g.status}</span>}</td><td>{canEdit&&<button className="icon-button" aria-label={`${g.name} 삭제`} onClick={()=>remove('guests',g.id)}><Trash2 size={16}/></button>}</td></tr>)}</tbody></table></div>:<Empty icon={Users} text={canEdit?'가장 먼저 초대하고 싶은 분은 누구인가요?':'아직 등록된 하객이 없습니다.'}/>}</section>}
@@ -81,6 +124,7 @@ function App(){
  {page==='venue'&&<VenueDetails/>}
  {page==='home'&&<HomePlanner data={data} canEdit={canEdit} onChange={update} onOpenBudget={()=>go('budget')}/>}
  {page==='honeymoon'&&<HoneymoonPlanner data={data} canEdit={canEdit} onChange={update} onOpenBudget={()=>go('budget')}/>}
+ {page==='invitation'&&<InvitationEditor data={data} onChange={update} invitationUrl={invitationUrl} onUploadPhoto={async(file,options)=>{if(!editable(sessionRef.current)||!cloud?.uploadInvitationPhoto)throw Error('사진을 업로드하지 못했습니다. 관리자 로그인과 연결 상태를 확인해 주세요.');return cloud.uploadInvitationPhoto(file,options)}}/>}
  </>}
  <footer><span><Flower2 size={14}/> Made for your next chapter.</span>{canEdit&&<div><button onClick={backup}><Download size={14}/> 백업</button><button onClick={()=>importRef.current.click()}><Upload size={14}/> 복원</button><input type="file" accept="application/json,.json" hidden ref={importRef} onChange={restore}/></div>}</footer>
  </main></div>{notice&&<div className="toast" role="status">{notice}<button className="icon-button" aria-label="알림 닫기" onClick={()=>setNotice('')}><X size={16}/></button></div>}

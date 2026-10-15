@@ -28,7 +28,7 @@ export default function AccessGate({onEnter,cloud}) {
       <div className="access-illustration" aria-hidden="true"><Heart size={32} strokeWidth={1.3}/><span>OUR NEXT CHAPTER</span></div>
       <div className="eyebrow">송윤오 ♥ 박예은</div>
       <h1 id="access-title">우리의 결혼 준비에<br/><i>오신 것을 환영해요.</i></h1>
-      <p className="access-description">함께 준비하는 두 사람은 이름과 별명으로,<br/>소중한 손님은 게스트로 들어오세요.</p>
+      <p className="access-description">함께 준비하는 두 사람은 관리자로,<br/>소중한 손님은 청첩장을 보실 수 있어요.</p>
       <form onSubmit={enter} onChange={()=>setError('')}>
         {step==='identity'?<>
           <label htmlFor="access-name">이름</label>
@@ -47,7 +47,7 @@ export default function AccessGate({onEnter,cloud}) {
       </form>
       <div className="access-divider"><span>또는</span></div>
       <button className="outline-button access-guest" onClick={()=>onEnter({role:'guest',name:'게스트'})}><UserRound size={16}/> 게스트로 보기</button>
-      <p className="access-caption">게스트는 준비 내용을 읽기 전용으로 볼 수 있어요.{cloud&&<><br/>관리자 편집은 이메일 인증 후 사용할 수 있습니다.</>}</p>
+      <p className="access-caption">게스트로 들어오면 모바일 청첩장이 열립니다.{cloud&&<><br/>관리자 편집은 이메일 인증 후 사용할 수 있습니다.</>}</p>
     </section>
     <p className="access-footer">A day to remember. A lifetime to love.</p>
   </main>;

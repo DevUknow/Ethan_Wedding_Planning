@@ -32,20 +32,21 @@ test('template selection, unit-price calculation, filtering and CSV are usable',
  await page.getByLabel('예산 분류 필터').selectOption('식대·연회');await expect(page.locator('.budget-table .budget-item-title')).toHaveCount(1);await page.getByRole('button',{name:'분류별 집계',exact:true}).click();await expect(page.locator('.budget-category-list')).toContainText('16,000,000원');await page.getByRole('button',{name:'식대·연회',exact:true}).click();
  const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'CSV 내보내기'}).click();const download=await downloadPromise;expect(download.suggestedFilename()).toBe('our-chapter-budget.csv');const content=await readFile(await download.path(),'utf8');expect(content).toContain('예식 식대');expect(content).not.toContain('브리에홀 대관·기본 연출');
 });
-test('budget layouts and dialogs fit mobile, and guests cannot change detailed records',async({page})=>{
+test('budget layouts and dialogs fit mobile, and guest invitation hides detailed records',async({page})=>{
  await admin(page);await addItem(page);await pay(page);
  await page.getByRole('button',{name:'예산 항목 추가'}).click();await page.getByLabel('예산 항목',{exact:true}).fill('본식 스냅');await page.getByRole('combobox',{name:'분류',exact:true}).selectOption('본식 사진·영상');await page.getByLabel('계획 금액 (원)',{exact:true}).fill('800000');await page.getByRole('button',{name:'예산 항목 저장'}).click();
  for(const width of [768,390,320]){await page.setViewportSize({width,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)}
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:'/tmp/our-chapter-budget-mobile.png',fullPage:true,animations:'disabled'});await page.getByRole('button',{name:`${name} 항목 수정`}).click();const box=await page.getByRole('dialog').boundingBox();expect(box.x).toBeGreaterThanOrEqual(0);expect(box.width).toBeLessThanOrEqual(390);await page.screenshot({path:'/tmp/our-chapter-budget-editor-mobile.png',animations:'disabled'});await page.keyboard.press('Escape');await expect(page.getByRole('button',{name:`${name} 항목 수정`})).toBeFocused();
  await page.setViewportSize({width:1440,height:1000});await page.evaluate(()=>window.scrollTo(0,0));await page.screenshot({path:'/tmp/our-chapter-budget-desktop.png',fullPage:true,animations:'disabled'});
- const before=await page.evaluate(()=>localStorage.getItem('our-chapter-v1'));await page.getByRole('button',{name:'접속 화면으로 돌아가기'}).click();await page.getByRole('button',{name:'게스트로 보기'}).click();await page.getByRole('button',{name:'예산 관리',exact:true}).click();await page.getByRole('button',{name:name,exact:true}).click();await expect(page.getByText('계약금',{exact:true})).toBeVisible();
- await expect(page.getByRole('button',{name:'예산 항목 추가'})).toHaveCount(0);await expect(page.getByRole('button',{name:/항목 수정|결제 수정|결제 삭제|CSV 내보내기/})).toHaveCount(0);await page.getByRole('button',{name:'결제 가계부',exact:true}).click();await expect(page.locator('.budget-journal-table')).toContainText('200,000');expect(await page.evaluate(()=>localStorage.getItem('our-chapter-v1'))).toBe(before);
+ await page.getByRole('button',{name:'접속 화면으로 돌아가기'}).click();const beforeGuest=await page.evaluate(()=>localStorage.getItem('our-chapter-v1'));await page.getByRole('button',{name:'게스트로 보기'}).click();
+ await expect(page.locator('.invitation-page')).toBeVisible();await expect(page.getByRole('button',{name:'예산 관리',exact:true})).toHaveCount(0);
+ await expect(page.locator('.budget-workspace')).toHaveCount(0);await expect(page.getByText(name,{exact:true})).toHaveCount(0);await expect(page.getByRole('button',{name:/항목 수정|결제 수정|결제 삭제|CSV 내보내기/})).toHaveCount(0);expect(await page.evaluate(()=>localStorage.getItem('our-chapter-v1'))).toBe(beforeGuest);
 });
-test('guest tables with larger legacy amounts stay inside the tablet viewport',async({page})=>{
+test('administrator tables with larger legacy amounts stay inside the tablet viewport',async({page})=>{
  await page.goto('/');
  const expenses=[{id:'a',title:'대관 계약금',category:'웨딩홀',amount:2000000},{id:'b',title:'준비 예약금',category:'기타',amount:70000},{id:'c',title:'촬영 패키지 예약금',category:'기타',amount:248000},{id:'d',title:'기타 큰 지출',category:'기타',amount:11000000}];
  await page.evaluate(expenses=>localStorage.setItem('our-chapter-v1',JSON.stringify({couple:'테스트 커플',date:'',budget:40000000,tasks:[],expenses,guests:[],saved:[]})),expenses);
- await page.reload();await page.getByRole('button',{name:'게스트로 보기'}).click();await page.getByRole('button',{name:'예산 관리',exact:true}).click();
+ await admin(page);
  for(const width of [1024,800,768,390,320]){
   await page.setViewportSize({width,height:844});
   for(const view of ['항목별 계획','결제 가계부','분류별 집계']){
