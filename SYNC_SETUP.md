@@ -24,7 +24,9 @@ on conflict (email) do update set name=excluded.name;
 
 전체 준비 기록인 `public.wedding_state`는 인증이 완료된 등록 관리자만 조회합니다. 게스트와 미등록 계정은 읽을 수 없습니다. 테이블 직접 쓰기는 관리자에게도 허용하지 않으며 등록 관리자만 `save_wedding_state` RPC를 통해 revision을 비교해 저장합니다.
 
-`public.wedding_invitation`은 게스트가 읽는 별도 공개 테이블입니다. 공개 데이터는 `groom`, `bride`, `date`, `time`, `greeting`, `heroPhoto`, `gallery`, `directionsNote`, `contactGroom`, `contactBride`만 포함합니다. 사진도 `id`, `url`, `alt`만 투영합니다. 서버 저장 시 명시적 허용 목록으로 공개 데이터를 만들며 예산·하객·집·여행 기록이나 임의의 추가 속성을 복사하지 않습니다. 공개 테이블에도 클라이언트 직접 쓰기는 허용하지 않습니다.
+`public.wedding_invitation`은 게스트가 읽는 별도 공개 테이블입니다. 공개 데이터는 `groom`, `bride`, `date`, `time`, `greeting`, `heroPhoto`, `gallery`, `directionsNote`, `contactGroom`, `contactBride`, `theme`, `story`만 포함합니다. 사진도 `id`, `url`, `alt`만 투영합니다. 서버 저장 시 명시적 허용 목록으로 공개 데이터를 만들며 예산·하객·집·여행 기록이나 임의의 추가 속성을 복사하지 않습니다. 공개 테이블에도 클라이언트 직접 쓰기는 허용하지 않습니다.
+
+`theme`은 `ivory` 또는 `briller-night`입니다. `story`에는 공개 여부인 `enabled`와 `firstMetDate`, `firstMetText`, `groomMessage`, `brideMessage`, `promise`만 허용합니다. 각 이야기 본문은 최대 1,000자이며 첫 만남 날짜는 선택입니다. 공개를 끈 이야기는 비공개 준비 기록에 보존하지만 공개 투영에서는 날짜·본문을 빈 값으로 만듭니다. 이야기 공개를 켜도 비워 둔 항목은 화면에서 생략합니다. 이전 기록에 두 설정이 없으면 아이보리 테마와 이야기 비공개 기본값을 사용합니다. 관리자 편집의 미리보기는 저장 전 초안을 보여 주며 공유 링크는 저장한 내용만 표시합니다.
 
 `private.is_wedding_admin()`은 비공개 스키마의 이메일 허용 목록과 현재 사용자의 인증 상태를 확인합니다. 인증 역할은 이 판정 함수만 실행하며 관리자 이메일 테이블에는 접근하지 못합니다. 공개 RPC인 `get_wedding_role`과 `save_wedding_state`의 `SECURITY DEFINER`는 이 검증을 거쳐 역할 조회와 저장만 제공하기 위한 구조입니다.
 
@@ -37,6 +39,12 @@ on conflict (email) do update set name=excluded.name;
 3. `supabase/invitation-upgrade.sql`을 실행해 전체 기록의 읽기 권한도 등록 관리자로 제한합니다. 게스트의 `wedding_state` 조회 거부와 공개 청첩장 조회 성공을 실제 API에서 확인합니다.
 
 `setup.sql`은 준비 기록과 공개 청첩장의 최종 권한 구조를 포함합니다. 신규 가입 차단은 3절의 Supabase Auth 설정으로 적용합니다.
+
+### 기존 청첩장에 테마·이야기 추가
+
+이미 모바일 청첩장을 사용하는 프로젝트는 먼저 이전 공개 필드와 새 `theme`·`story` 필드를 모두 읽을 수 있는 프런트엔드를 배포합니다. 그다음 SQL Editor에서 `supabase/invitation-story-upgrade.sql`을 실행해 검증·공개 투영 함수를 갱신하고 현재 비공개 기록으로 공개 청첩장을 다시 만듭니다. 이 SQL은 반복 실행할 수 있으며 준비 기록과 revision은 변경하지 않습니다. 기존 관리자 권한과 신규 가입 차단 설정도 유지합니다.
+
+업그레이드 후 관리자에서 테마와 이야기를 저장하고 게스트 링크에 반영되는지 확인합니다. 이야기 공개를 끄면 공개 API의 이야기 날짜·본문이 비워지고 관리자 기록에는 남는지도 확인하세요. 운영 기록을 테스트용 이야기로 덮어쓰지 않습니다.
 
 ### 청첩장 사진
 

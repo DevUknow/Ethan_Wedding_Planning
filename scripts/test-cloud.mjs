@@ -17,7 +17,9 @@ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 const url=`http://127.0.0.1:${server.address().port}`;
 const browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{})});
 let row={id:'main',revision:0,data:{couple:'송윤오 ♥ 박예은',date:'2027-04-17',budget:30000000,tasks:[],expenses:[],guests:[],saved:[],futurePrivateSecret:'private-future-token'}};
-let publicRow={id:'main',revision:0,data:toPublicInvitation(row.data)};
+const legacyInvitation=toPublicInvitation(row.data);
+delete legacyInvitation.theme;delete legacyInvitation.story;
+let publicRow={id:'main',revision:0,data:legacyInvitation};
 let writes=0,conflicts=0,injectConflict=false,holdNextWrite=false,releaseWrite=null;
 const sockets=new Set(),errors=[],requests=[],otpRequests=[],publicResponses=[],storage=new Map();
 const user={id:'00000000-0000-0000-0000-000000000001',aud:'authenticated',role:'authenticated',email:'admin@example.com',email_confirmed_at:new Date().toISOString(),app_metadata:{provider:'email',providers:['email']},user_metadata:{},identities:[],created_at:new Date().toISOString()};
@@ -117,6 +119,8 @@ try{
  const a=await admin.newPage(),b=await otherAdmin.newPage(),g=await guest.newPage(),d=await direct.newPage();
  await g.goto(url);await g.getByRole('button',{name:'게스트로 보기',exact:true}).click();await expectPublic(g);
  await d.goto(url+'/?invite=1');await expectPublic(d);
+ await expect(g.locator('.invitation-page')).toHaveAttribute('data-theme','ivory');
+ await expect(g.locator('.invitation-story')).toHaveCount(0);
  assert.equal(requests.filter(request=>['guest','direct'].includes(request.label)&&privatePath(request)).length,0,'Public entry must never read or subscribe to private planning records');
  await login(a);await login(b);
  assert.equal(otpRequests.filter(request=>!request.probe).length,2);
@@ -174,6 +178,10 @@ try{
  await a.getByRole('button',{name:'모바일 청첩장',exact:true}).click();
  const beforeInvitation=writes;
  for(const [label,value] of [['신랑 이름','윤오'],['신부 이름','예은'],['예식 날짜','2027-05-22'],['예식 시간','13:30'],['초대 글','우리의 새로운 시작에 함께해 주세요.'],['추가 교통 안내','지하철 평촌역에서 만나 뵙겠습니다.'],['신랑 연락처','010-1234-5678'],['신부 연락처','010-2345-6789']])await a.getByLabel(label,{exact:true}).fill(value);
+ await a.getByRole('radio',{name:'블랙 · 샴페인 골드',exact:true}).check();
+ await a.getByRole('checkbox',{name:'우리의 이야기 공개',exact:true}).check();
+ for(const [label,value] of [['처음 만난 날','2021-04-11'],['첫 만남 이야기','함께 걷던 첫 산책을 기억해요.'],['신랑이 전하는 말','함께 웃을 수 있어 고마워요.'],['신부가 전하는 말','서로를 응원하며 걸어갈게요.'],['우리의 약속','다정한 마음을 잊지 않겠습니다.']])await a.getByLabel(label,{exact:true}).fill(value);
+ assert.equal(publicRow.data.theme,'ivory');assert.equal(publicRow.data.story.enabled,false);
  await a.getByLabel('대표 사진 업로드',{exact:true}).setInputFiles('app/src/assets/venue/briller-hall.webp');
  await expect(a.getByLabel('대표 사진 설명',{exact:true})).toBeVisible();await a.getByLabel('대표 사진 설명',{exact:true}).fill('공개 초대장 대표 사진');
  assert.equal(writes,beforeInvitation);assert.equal(storage.size,1);
@@ -181,11 +189,29 @@ try{
  await expect.poll(()=>row.data.invitation?.groom).toBe('윤오');assert.equal(row.data.date,'2027-05-22');assert.equal(row.data.invitation.time,'13:30');
  assert.match(row.data.invitation.heroPhoto.url,/\/storage\/v1\/object\/public\/wedding-invitation\/hero\/.+\.jpg$/);
  await expect(g.locator('.invitation-paper')).toContainText('우리의 새로운 시작에 함께해 주세요.');
+ await expect(g.locator('.invitation-page')).toHaveAttribute('data-theme','briller-night');
+ await expect(g.locator('.invitation-story')).toContainText('함께 걷던 첫 산책을 기억해요.');
+ await expect(g.locator('.invitation-story')).toContainText('다정한 마음을 잊지 않겠습니다.');
+ assert.equal(publicRow.data.story.firstMetDate,'2021-04-11');
  await expect(g.locator('.invitation-paper')).toContainText('오후 1시 30분');await expectPublic(g);
  for(const page of [g,d]){await page.reload();await expectPublic(page);await expect(page.locator('.invitation-paper')).toContainText('우리의 새로운 시작에 함께해 주세요.')}
  await g.setViewportSize({width:390,height:844});await g.screenshot({path:'/tmp/our-chapter-cloud-invitation-mobile.png',fullPage:true});
  await expect.poll(()=>g.locator('.invitation-paper img').first().evaluate(image=>image.complete&&image.naturalWidth>0)).toBe(true);
  assert.equal(await g.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+ // Hiding the story also removes its text from the public API, while the
+ // private document keeps it available for future editing.
+ const savedStory=structuredClone(row.data.invitation.story);
+ await a.getByRole('checkbox',{name:'우리의 이야기 공개',exact:true}).uncheck();
+ await a.getByRole('button',{name:'청첩장 저장',exact:true}).click();
+ await expect.poll(()=>row.data.invitation.story.enabled).toBe(false);
+ await expect(g.locator('.invitation-story')).toHaveCount(0);
+ assert.deepEqual(row.data.invitation.story,{...savedStory,enabled:false});
+ assert.deepEqual(publicRow.data.story,{enabled:false,firstMetDate:'',firstMetText:'',groomMessage:'',brideMessage:'',promise:''});
+ assert.equal(JSON.stringify(publicRow.data).includes(savedStory.firstMetText),false);
+ await g.reload();await expectPublic(g);await expect(g.locator('.invitation-story')).toHaveCount(0);
+ await a.reload();await a.getByRole('button',{name:'모바일 청첩장',exact:true}).click();
+ await expect(a.getByRole('radio',{name:'블랙 · 샴페인 골드',exact:true})).toBeChecked();
+ await expect(a.getByLabel('첫 만남 이야기',{exact:true})).toHaveValue(savedStory.firstMetText);
  const publicReads=requests.filter(request=>['guest','direct'].includes(request.label)&&request.path==='/rest/v1/wedding_invitation');assert.ok(publicReads.length>=4);
  assert.ok(publicResponses.every(validInvitation));for(const published of publicResponses)assert.equal(JSON.stringify(published).includes('비공개'),false);
  assert.equal(requests.filter(request=>['guest','direct'].includes(request.label)&&privatePath(request)&&!request.probe).length,0);
@@ -204,5 +230,5 @@ try{
  await expect(a.getByRole('button',{name:'게스트로 보기',exact:true})).toBeVisible();releaseWrite();releaseWrite=null;
  await a.getByRole('button',{name:'게스트로 보기',exact:true}).click();await expectPublic(a);await expect(a.locator('body')).not.toContainText('비공개 로그아웃 대기 기록');
  assert.deepEqual(errors,[]);
- console.log('Mock cloud browser passed: verified existing-account OTP with account creation disabled, signup rejection, private admin access, two-device realtime, conflict retry, budgets/payments, home and Bali records, separate public invitation, draft photo upload and explicit publication, guest privacy, anonymous denial and logout callback guard. Production Auth settings and RLS still require separate validation.');
+ console.log('Mock cloud browser passed: legacy invitation compatibility, story/theme explicit publication and realtime, disabled-story API privacy and private draft retention, existing-account OTP with signup disabled, private admin access, two-device conflicts, budgets/home/Bali, photo upload, guest privacy and logout guard. Production Auth settings and RLS still require separate validation.');
 }finally{releaseWrite?.();await browser.close();await new Promise(resolve=>server.close(resolve))}
