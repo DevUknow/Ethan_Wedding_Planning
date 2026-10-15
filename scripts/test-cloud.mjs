@@ -19,7 +19,7 @@ const browser=await chromium.launch({headless:true,...(process.env.PLAYWRIGHT_CH
 let row={id:'main',revision:0,data:{couple:'송윤오 ♥ 박예은',date:'2027-04-17',budget:30000000,tasks:[],expenses:[],guests:[],saved:[],futurePrivateSecret:'private-future-token'}};
 let publicRow={id:'main',revision:0,data:toPublicInvitation(row.data)};
 let writes=0,conflicts=0,injectConflict=false,holdNextWrite=false,releaseWrite=null;
-const sockets=new Set(),errors=[],requests=[],publicResponses=[],storage=new Map();
+const sockets=new Set(),errors=[],requests=[],otpRequests=[],publicResponses=[],storage=new Map();
 const user={id:'00000000-0000-0000-0000-000000000001',aud:'authenticated',role:'authenticated',email:'admin@example.com',email_confirmed_at:new Date().toISOString(),app_metadata:{provider:'email',providers:['email']},user_metadata:{},identities:[],created_at:new Date().toISOString()};
 const token=[Buffer.from('{"alg":"HS256","typ":"JWT"}').toString('base64url'),Buffer.from(JSON.stringify({sub:user.id,role:'authenticated',exp:Math.floor(Date.now()/1000)+3600})).toString('base64url'),'fixture'].join('.');
 function publish(table){const record=table==='wedding_state'?row:publicRow;for(const socket of sockets)if(socket.table===table)socket.send('postgres_changes',{ids:[1],data:{schema:'public',table,type:'UPDATE',columns:[{name:'id',type:'text'},{name:'data',type:'jsonb'},{name:'revision',type:'int8'}],record,old_record:{},commit_timestamp:new Date().toISOString()}})}
@@ -37,7 +37,12 @@ async function context(label){
   if(p==='/rest/v1/wedding_state'){
    if(!authorized){status=403;data={message:'Administrator required',code:'42501'}}else data=row;
   }else if(p==='/rest/v1/wedding_invitation'){data=publicRow;publicResponses.push(structuredClone(data.data))}
-  else if(p==='/auth/v1/otp')data={};
+  else if(p==='/auth/v1/otp'){
+   otpRequests.push({label,probe,body});
+   if(body?.create_user!==false){status=422;data={code:'signup_disabled',message:'Signups not allowed for otp'}}
+   else if(body.email!==user.email){status=422;data={code:'otp_disabled',message:'Signups not allowed for otp'}}
+   else data={};
+  }
   else if(p==='/auth/v1/verify')data={access_token:token,refresh_token:'fixture-refresh',token_type:'bearer',expires_in:3600,user};
   else if(p==='/auth/v1/user'){if(authorized)data=user;else{status=401;data={message:'Invalid token'}}}
   else if(p==='/auth/v1/logout'){status=204;data=null}
@@ -92,7 +97,10 @@ async function context(label){
 async function login(page){
  await page.goto(url);await expect(page.getByLabel('관리자 이메일')).toBeVisible();
  await page.getByLabel('이름',{exact:true}).fill('송윤오');await page.getByLabel('별명').fill('예쁜강아지');await page.getByLabel('관리자 이메일').fill('admin@example.com');
- await page.getByRole('button',{name:'인증 메일 받기'}).click();await page.getByLabel('이메일 인증 코드').fill('123456');await page.getByRole('button',{name:'인증하고 들어가기'}).click();
+ const otpResponse=page.waitForResponse(response=>new URL(response.url()).pathname==='/auth/v1/otp');
+ await page.getByRole('button',{name:'인증 메일 받기'}).click();
+ const sent=await otpResponse;assert.equal(sent.request().postDataJSON().create_user,false,'Administrator OTP login must never create a new account');assert.equal(sent.status(),200);
+ await page.getByLabel('이메일 인증 코드').fill('123456');await page.getByRole('button',{name:'인증하고 들어가기'}).click();
  await expect(page.locator('.role-badge')).toHaveText('송윤오 · 관리자');
  await expect(page.locator('.sync-banner')).toContainText('공유 기록이 연결되어 있어요');
 }
@@ -111,6 +119,13 @@ try{
  await d.goto(url+'/?invite=1');await expectPublic(d);
  assert.equal(requests.filter(request=>['guest','direct'].includes(request.label)&&privatePath(request)).length,0,'Public entry must never read or subscribe to private planning records');
  await login(a);await login(b);
+ assert.equal(otpRequests.filter(request=>!request.probe).length,2);
+ assert.ok(otpRequests.filter(request=>!request.probe).every(request=>request.body.create_user===false));
+ const signupProbe=await g.evaluate(async()=>{
+  const response=await fetch('https://sync-test.supabase.co/auth/v1/otp',{method:'POST',headers:{'content-type':'application/json',apikey:'sb_publishable_test','x-security-probe':'1'},body:JSON.stringify({email:'new-user@example.com',create_user:true})});
+  return {status:response.status,body:await response.json()};
+ });
+ assert.equal(signupProbe.status,422);assert.equal(signupProbe.body.code,'signup_disabled');
 
  // A forced compare-and-swap conflict stands for a concurrent device update.
  injectConflict=true;
@@ -189,5 +204,5 @@ try{
  await expect(a.getByRole('button',{name:'게스트로 보기',exact:true})).toBeVisible();releaseWrite();releaseWrite=null;
  await a.getByRole('button',{name:'게스트로 보기',exact:true}).click();await expectPublic(a);await expect(a.locator('body')).not.toContainText('비공개 로그아웃 대기 기록');
  assert.deepEqual(errors,[]);
- console.log('Mock cloud browser passed: verified private admin access, two-device realtime, conflict retry, budgets/payments, home and Bali records, separate public invitation, draft photo upload and explicit publication, guest privacy, anonymous denial and logout callback guard. Production RLS still requires separate validation.');
+ console.log('Mock cloud browser passed: verified existing-account OTP with account creation disabled, signup rejection, private admin access, two-device realtime, conflict retry, budgets/payments, home and Bali records, separate public invitation, draft photo upload and explicit publication, guest privacy, anonymous denial and logout callback guard. Production Auth settings and RLS still require separate validation.');
 }finally{releaseWrite?.();await browser.close();await new Promise(resolve=>server.close(resolve))}

@@ -14,7 +14,7 @@
 
 새 프로젝트는 Supabase SQL Editor에서 `supabase/setup.sql`을 실행합니다. 기존 공유 기록은 재실행해도 삭제되지 않습니다. 관리자 이메일 등록은 SQL Editor에서 별도로 실행하며, 관리자 이메일 목록은 공개 클라이언트가 접근하지 못하는 `private.wedding_admins`에 저장합니다.
 
-현재 사용자가 등록을 요청한 관리자는 송윤오 한 명입니다. 실제 이메일을 포함한 등록 SQL은 공개 저장소에 올리지 않습니다. 박예은의 이메일은 추가 요청 후 등록합니다.
+실제 관리자 이메일을 포함한 등록 SQL은 공개 저장소에 올리지 않습니다. 신규 프로젝트에서는 운영자가 필요한 관리자 인증 계정을 별도로 생성하고 아래 이메일 허용 목록에 등록합니다. 현재 운영 프로젝트는 기존 등록 관리자 계정만 사용합니다. 추가 계정은 사용자가 추후 명시적으로 허용할 때 운영자가 별도로 생성하며 공개 가입을 다시 열지 않습니다. 허용 목록 등록만으로 인증 계정이 자동 생성되지는 않습니다.
 
 ```sql
 insert into private.wedding_admins(email,name)
@@ -36,7 +36,7 @@ on conflict (email) do update set name=excluded.name;
 2. 모바일 청첩장을 읽는 새 프런트엔드를 빌드·배포합니다. 게스트가 `wedding_invitation`만 요청하는지 확인합니다.
 3. `supabase/invitation-upgrade.sql`을 실행해 전체 기록의 읽기 권한도 등록 관리자로 제한합니다. 게스트의 `wedding_state` 조회 거부와 공개 청첩장 조회 성공을 실제 API에서 확인합니다.
 
-`setup.sql`은 최종 권한 구조를 포함하므로 신규 설치에는 이 파일 하나를 사용합니다.
+`setup.sql`은 준비 기록과 공개 청첩장의 최종 권한 구조를 포함합니다. 신규 가입 차단은 3절의 Supabase Auth 설정으로 적용합니다.
 
 ### 청첩장 사진
 
@@ -44,7 +44,9 @@ SQL은 공개 `wedding-invitation` Storage 버킷을 만듭니다. 사진 업로
 
 ## 3. 이메일 인증
 
-Supabase Authentication에서 Email 인증을 켭니다. **Authentication → Notifications → Emails → Templates**에서 **Confirm sign up**과 **Magic Link / OTP** 두 템플릿의 본문을 다음과 같이 설정합니다. 첫 접속에서 계정이 생성될 때는 Confirm sign up이 사용되고, 이후 로그인에는 Magic Link / OTP가 사용됩니다. 한쪽만 수정하면 인증 코드 없이 링크만 있는 메일을 받을 수 있습니다.
+Supabase Authentication의 Email 인증은 유지하고 **Allow new users to sign up**은 끕니다(`disable_signup: true`). 현재 운영 프로젝트에도 이 설정을 적용하고 실제 API의 신규 가입 요청 거부를 확인했습니다. 기존 인증 계정의 로그인·갱신은 유지합니다. 사이트의 OTP 요청은 `shouldCreateUser: false`로 보내므로 미등록 이메일로 인증을 요청해도 계정을 생성하지 않습니다. 추가 관리자 인증 계정은 사용자가 추후 명시적으로 허용할 때 운영자가 별도로 생성하고 이메일 허용 목록에 등록합니다.
+
+**Authentication → Notifications → Emails → Templates**에서 **Magic Link / OTP** 템플릿의 본문을 다음과 같이 설정합니다. 현재 로그인은 이미 생성된 인증 계정에만 코드를 발송하며 첫 접속 자동 가입은 사용하지 않습니다.
 
 ```html
 <h2>Our Chapter 관리자 인증</h2>
@@ -57,7 +59,7 @@ Supabase Authentication에서 Email 인증을 켭니다. **Authentication → No
 
 사이트에서 이름·별명·등록된 이메일을 입력하고 메일의 인증 코드를 입력합니다. 실제 저장 권한은 서버가 이메일 인증 결과로 판단합니다. 브라우저의 역할 값을 바꿔도 서버의 비공개 기록 조회·저장 권한을 얻을 수 없습니다.
 
-이미 코드 없는 가입 확인 메일을 받았다면 두 템플릿을 저장한 뒤 사이트에서 **이메일 다시 입력 → 인증 메일 받기**로 새 메일을 요청합니다. 새로 받은 메일의 코드를 사이트에 입력합니다. 발송 간격 제한이 표시되면 지정된 시간 뒤에 다시 요청합니다.
+기존 계정으로 코드 없는 로그인 메일을 받았다면 Magic Link / OTP 템플릿을 저장한 뒤 사이트에서 **이메일 다시 입력 → 인증 메일 받기**로 새 메일을 요청합니다. 새로 받은 메일의 코드를 사이트에 입력합니다. 발송 간격 제한이 표시되면 지정된 시간 뒤에 다시 요청합니다.
 
 Supabase의 기본 메일 발송 서비스는 프로젝트 팀의 승인된 주소로 발송을 제한할 수 있습니다. 외부 주소로 발송하려면 사용자 소유 SMTP를 설정하거나 해당 이메일을 Supabase 프로젝트 팀에 추가해야 합니다. 발송 제한·이메일 수신·인증 성공을 실제 프로젝트에서 확인하세요.
 
@@ -78,7 +80,7 @@ npm test
 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium npm run test:cloud
 ```
 
-`test:cloud`는 테스트 전용 Supabase HTTP/웹소켓 응답을 사용한 브라우저 검사입니다. 실제 프로젝트나 실제 이메일 발송 검증을 대체하지 않습니다. PostgreSQL 권한·충돌 검사도 테스트용 DB에서 실행합니다.
+`test:cloud`는 테스트 전용 Supabase HTTP/웹소켓 응답을 사용한 브라우저 검사입니다. 실제 OTP 요청 본문의 `create_user: false`, 기존 계정 로그인, 가입을 요청하는 호출의 거부도 검사하며 실제 메일은 보내지 않습니다. 실제 프로젝트나 실제 이메일 발송 검증을 대체하지 않습니다. PostgreSQL 권한·충돌 검사도 테스트용 DB에서 실행합니다.
 
 ## 검증 범위
 
