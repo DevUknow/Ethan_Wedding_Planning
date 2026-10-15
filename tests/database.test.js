@@ -6,6 +6,10 @@ import {initialData} from '../app/src/model.js';
 import {saveExpense,savePayment} from '../app/src/budget-model.js';
 import {saveHomeItem,setHomeBudget,linkHomeItemToBudget} from '../app/src/home-model.js';
 import {saveHoneymoonSettings,saveHoneymoonItem,saveHoneymoonPackingItem,linkHoneymoonItemToBudget} from '../app/src/honeymoon-model.js';
+import {toPublicInvitation} from '../app/src/invitation-model.js';
+
+const blankStory = () => ({enabled:false,firstMetDate:'',firstMetText:'',groomMessage:'',brideMessage:'',promise:''});
+const publicFields = ['groom','bride','date','time','greeting','heroPhoto','gallery','directionsNote','contactGroom','contactBride','theme','story'];
 
 test('PostgreSQL restricts writes to verified approved emails and handles revisions',async()=>{
  const db=new PGlite();
@@ -23,7 +27,8 @@ test('PostgreSQL restricts writes to verified approved emails and handles revisi
   await assert.rejects(db.query('select * from public.wedding_state'), /permission denied/);
   const publicSeed=(await db.query('select * from public.wedding_invitation')).rows[0];
   assert.equal(publicSeed.data.groom,'송윤오');assert.equal(publicSeed.data.bride,'박예은');assert.equal(publicSeed.data.date,'');
-  assert.deepEqual(Object.keys(publicSeed.data).sort(),['groom','bride','date','time','greeting','heroPhoto','gallery','directionsNote','contactGroom','contactBride'].sort());
+  assert.deepEqual(Object.keys(publicSeed.data).sort(),publicFields.slice().sort());
+  assert.equal(publicSeed.data.theme,'ivory');assert.deepEqual(publicSeed.data.story,blankStory());
   await assert.rejects(db.query("update public.wedding_invitation set data='{}'::jsonb"));
   await assert.rejects(db.query('update public.wedding_state set revision=999'));
   await assert.rejects(db.query("select * from public.save_wedding_state(0,'{}'::jsonb)"));
@@ -65,7 +70,8 @@ test('PostgreSQL restricts writes to verified approved emails and handles revisi
   assert.deepEqual(tripSaved.rows[0].data.expenses.slice(0,decorated.expenses.length),decorated.expenses);
   assert.deepEqual(tripSaved.rows[0].data.expenses.find(expense=>expense.id==='trip-trip-ubud-stay').payments,[]);
   const photo={id:'public-photo',url:'https://example.com/wedding.jpg',alt:'우리의 사진',privateContract:'never public'};
-  const invitation={groom:'신랑 이름',bride:'신부 이름',time:'14:30',greeting:'함께해 주세요.',heroPhoto:photo,gallery:[photo],directionsNote:'대중교통 이용을 권장합니다.',contactGroom:'010-1234-5678',contactBride:'',budget:'private invitation unknown key'};
+  const story={enabled:true,firstMetDate:'2020-02-29',firstMetText:'우리가 처음 만난 날',groomMessage:'함께할 날들을 기대합니다.',brideMessage:'매일 서로의 편이 되어 줄게요.',promise:'작은 행복을 함께 나누겠습니다.',futurePrivate:'private-story-token'};
+  const invitation={groom:'신랑 이름',bride:'신부 이름',time:'14:30',greeting:'함께해 주세요.',heroPhoto:photo,gallery:[photo],directionsNote:'대중교통 이용을 권장합니다.',contactGroom:'010-1234-5678',contactBride:'',theme:'briller-night',story,budget:'private invitation unknown key'};
   const invited={...trip,date:'2027-05-23',invitation};
   const invitationSaved=await db.query('select * from public.save_wedding_state($1,$2::jsonb)',[4,JSON.stringify(invited)]);
   assert.equal(invitationSaved.rows[0].revision,5);assert.deepEqual(invitationSaved.rows[0].data,invited);
@@ -74,6 +80,10 @@ test('PostgreSQL restricts writes to verified approved emails and handles revisi
   assert.equal(publicInvitation.data.groom,invitation.groom);assert.equal(publicInvitation.data.bride,invitation.bride);
   assert.deepEqual(publicInvitation.data.heroPhoto,{id:photo.id,url:photo.url,alt:photo.alt});
   assert.deepEqual(publicInvitation.data.gallery,[{id:photo.id,url:photo.url,alt:photo.alt}]);
+  assert.equal(publicInvitation.data.theme,'briller-night');
+  assert.deepEqual(publicInvitation.data,toPublicInvitation(invited));
+  assert.deepEqual(Object.keys(publicInvitation.data.story).sort(),Object.keys(blankStory()).sort());
+  assert.equal(JSON.stringify(publicInvitation.data).includes('private-story-token'),false);
   for(const key of ['budget','tasks','expenses','guests','home','honeymoon','saved']) assert.equal(Object.hasOwn(publicInvitation.data,key),false);
   assert.equal((await db.query('select * from public.save_wedding_state($1,$2::jsonb)',[0,JSON.stringify(initialData)])).rows.length,0);
   assert.deepEqual((await db.query('select * from public.wedding_invitation')).rows[0],publicInvitation);
@@ -88,6 +98,18 @@ test('PostgreSQL restricts writes to verified approved emails and handles revisi
     {...invited,invitation:{...invitation,contactBride:'not a phone'}},
     {...invited,invitation:{...invitation,greeting:'x'.repeat(3001)}},
     {...invited,invitation:{...invitation,heroPhoto:{id:'missing-url',alt:''}}},
+    ...['',null,'night',false,{},[]].map(theme=>({...invited,invitation:{...invitation,theme}})),
+    ...[
+      null,[],{},'story',
+      {...story,enabled:'true'},
+      {...story,firstMetDate:'2027-02-29'},
+      {...story,firstMetDate:null},
+      {...story,firstMetText:null},
+      {...story,firstMetText:'x'.repeat(1001)},
+      {...story,groomMessage:'x'.repeat(1001)},
+      {...story,brideMessage:5},
+      {...story,promise:[]},
+    ].map(story=>({...invited,invitation:{...invitation,story}})),
   ]) await assert.rejects(db.query('select * from public.save_wedding_state($1,$2::jsonb)',[5,JSON.stringify(invalid)]),/Invalid/);
   assert.deepEqual((await db.query('select * from public.wedding_invitation')).rows[0],publicInvitation);
   await db.exec('reset role;');await db.exec(sql);
@@ -99,6 +121,50 @@ test('PostgreSQL restricts writes to verified approved emails and handles revisi
   await assert.rejects(db.query('select * from public.wedding_state'), /permission denied/);
   const anonymous=(await db.query('select * from public.wedding_invitation')).rows[0];
   assert.deepEqual(anonymous,publicInvitation);
+ }finally{await db.close()}
+});
+
+test('story-only rollout preserves private records, policies and revisions and keeps hidden drafts private',async()=>{
+ const db=new PGlite();
+ try{
+  await db.exec(`create role anon;create role authenticated;create schema auth;
+    create table auth.users(id uuid primary key,email text,email_confirmed_at timestamptz);
+    create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;`);
+  await db.exec(await readFile(new URL('../supabase/setup.sql',import.meta.url),'utf8'));
+  const settings={groom:'송윤오',bride:'박예은',time:'',greeting:'우리의 결혼식에 초대합니다.',heroPhoto:null,gallery:[],directionsNote:'',contactGroom:'',contactBride:''};
+  const draft={enabled:false,firstMetDate:'2020-02-29',firstMetText:'private-first-met-token',groomMessage:'private-groom-token',brideMessage:'private-bride-token',promise:'private-promise-token',futurePrivate:'private-story-future-token'};
+  const privateData={...initialData,invitation:{...settings,theme:'briller-night',story:draft,futurePrivate:'private-invitation-future-token'}};
+  await db.query("update public.wedding_state set data=$1::jsonb,revision=34,updated_at='2026-10-15T08:00:00Z' where id='main'",[JSON.stringify(privateData)]);
+  const before=(await db.query('select * from public.wedding_state')).rows[0];
+  // Simulate the already-deployed ten-field public envelope from the earlier frontend.
+  await db.query("update public.wedding_invitation set data=$1::jsonb,revision=34,updated_at='2026-10-15T08:00:00Z' where id='main'",[JSON.stringify({date:privateData.date,...settings})]);
+  const policies=(await db.query("select schemaname,tablename,policyname,roles,cmd,qual,with_check from pg_policies order by schemaname,tablename,policyname")).rows;
+  const rpc=(await db.query("select pg_get_functiondef('public.save_wedding_state(bigint,jsonb)'::regprocedure) as definition")).rows[0];
+  const upgrade=await readFile(new URL('../supabase/invitation-story-upgrade.sql',import.meta.url),'utf8');
+  await db.exec(upgrade);await db.exec(upgrade);
+  assert.deepEqual((await db.query('select * from public.wedding_state')).rows[0],before);
+  assert.deepEqual((await db.query("select schemaname,tablename,policyname,roles,cmd,qual,with_check from pg_policies order by schemaname,tablename,policyname")).rows,policies);
+  assert.deepEqual((await db.query("select pg_get_functiondef('public.save_wedding_state(bigint,jsonb)'::regprocedure) as definition")).rows[0],rpc);
+  const published=(await db.query('select * from public.wedding_invitation')).rows[0];
+  assert.equal(published.revision,34);assert.deepEqual(published.updated_at,before.updated_at);
+  assert.deepEqual(published.data,toPublicInvitation(privateData));
+  assert.deepEqual(published.data.story,blankStory());
+  assert.equal(JSON.stringify(published.data).includes('private-'),false);
+  // A concurrent save can publish a newer revision while rollout reads its
+  // snapshot. Reseeding must never roll that public revision back.
+  await db.exec("update public.wedding_invitation set revision=35,data=jsonb_set(data,'{greeting}','\"newer public revision\"'::jsonb) where id='main'");
+  const newerPublic=(await db.query('select * from public.wedding_invitation')).rows[0];
+  await db.exec(upgrade);
+  assert.deepEqual((await db.query('select * from public.wedding_invitation')).rows[0],newerPublic);
+  assert.deepEqual((await db.query('select * from public.wedding_state')).rows[0],before);
+  const enabled={...privateData,invitation:{...privateData.invitation,story:{...draft,enabled:true}}};
+  assert.deepEqual((await db.query('select private.invitation_projection($1::jsonb) as data',[JSON.stringify(enabled)])).rows[0].data,toPublicInvitation(enabled));
+  assert.equal((await db.query('select private.valid_invitation_settings($1::jsonb) as valid',[JSON.stringify(settings)])).rows[0].valid,true);
+  assert.deepEqual((await db.query('select private.invitation_projection($1::jsonb) as data',[JSON.stringify({...initialData,invitation:settings})])).rows[0].data,toPublicInvitation({...initialData,invitation:settings}));
+  await db.exec('set role anon;');
+  await assert.rejects(db.query('select * from public.wedding_state'),/permission denied/);
+  await assert.rejects(db.query('select private.valid_invitation_story($1::jsonb)',[JSON.stringify(draft)]),/permission denied/);
+  assert.deepEqual((await db.query('select data from public.wedding_invitation')).rows[0].data.story,blankStory());
  }finally{await db.close()}
 });
 

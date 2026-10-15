@@ -1,5 +1,202 @@
-.invitation-page{--invite-ink:#4c5946;--invite-soft:#7e8675;--invite-gold:#a5916c;max-width:none;margin:0;padding:0;min-height:100svh;background:#eeece5;color:var(--invite-ink);font-family:'Noto Sans KR',sans-serif}.invitation-page *{box-sizing:border-box}.invitation-paper{max-width:480px;margin:0 auto;background:#fcfaf5;box-shadow:0 0 70px #4c594615;overflow:hidden}.invitation-page button,.invitation-page a{-webkit-tap-highlight-color:transparent}.invitation-page button:focus-visible,.invitation-page a:focus-visible{outline:2px solid #71845d;outline-offset:4px}.invitation-page a{color:inherit}.invitation-preview-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 20px;background:#e6ebdb;color:#5c6c4e;font-size:11px}.invitation-preview-bar button{display:flex;gap:6px;align-items:center;font-size:11px}.invitation-cover{position:relative;text-align:center}.invitation-cover-top{padding:39px 24px 28px}.invitation-cover-top>span{font:9px Georgia,serif;letter-spacing:3.6px;color:#92977f}.invitation-cover-top>p{display:flex;align-items:center;justify-content:center;gap:21px;margin:19px 0 0;font-size:17px;font-weight:400;letter-spacing:3px}.invitation-cover-top>p svg{color:#b4a485;flex-shrink:0}.invitation-cover-photo{position:relative;display:block;width:100%;height:410px;padding:0;overflow:hidden;border:0;background:#e5e1d3}.invitation-cover-photo img{width:100%;height:100%;object-fit:cover;object-position:center}.invitation-photo-veil{position:absolute;inset:0;background:linear-gradient(180deg,transparent 65%,#fcfaf520)}.invitation-cover-bottom{position:relative;padding:28px 20px 16px;background:#fcfaf5}.invitation-cover-script{position:relative;font:italic 24px Georgia,serif;color:#8e9379;margin:0 0 22px}.invitation-cover h1{position:relative;margin:0 0 22px;font-family:'Noto Serif KR','Batang',Georgia,serif;letter-spacing:4px;font-size:27px;font-weight:400;color:#4e5e43;line-height:1.6}.invitation-cover-date{position:relative;font-size:12px;line-height:1.9;margin:0 0 6px;letter-spacing:.3px}.invitation-cover-venue{position:relative;font-size:12px;line-height:1.9;margin:0;letter-spacing:.3px}.invitation-venue-caption{display:block;position:relative;margin-top:13px;font-size:9px;letter-spacing:.7px;color:#999781}.invitation-botanical{color:#7c8c65;width:110px;height:110px;position:absolute;pointer-events:none}.invitation-cover-bottom>.invitation-botanical{width:135px;height:135px;left:-42px;top:13px;opacity:.7;transform:rotate(-14deg)}.invitation-scroll{position:relative;display:inline-flex;align-items:center;justify-content:center;margin-top:23px;width:35px;height:35px;color:#a5ab94}.invitation-section{text-align:center;padding:68px 31px;position:relative}.invitation-kicker{display:block;font:10px Georgia,serif;letter-spacing:3.5px;color:var(--invite-gold);margin-bottom:20px}.invitation-section h2{font-family:'Noto Serif KR','Batang',Georgia,serif;font-weight:400;font-size:23px;line-height:1.85;letter-spacing:2px;margin:0 0 28px;color:#536247}.invitation-message{padding-top:70px;padding-bottom:65px}.invitation-message>.invitation-botanical{right:-34px;top:65px;width:125px;height:125px;opacity:.55;transform:rotate(165deg)}.invitation-greeting{position:relative;white-space:pre-line;overflow-wrap:anywhere;font-family:'Noto Serif KR','Batang',Georgia,serif;font-size:14px;line-height:2.3;color:#747865;margin:0 auto;max-width:335px;word-break:keep-all}.invitation-signatures{display:flex;align-items:center;justify-content:center;gap:22px;margin-top:35px}.invitation-signatures>p{display:flex;align-items:baseline;gap:12px;margin:0}.invitation-signatures small{font-size:10px;color:#939781}.invitation-signatures strong{font-size:15px;font-weight:400;letter-spacing:2px}.invitation-signatures>span{font:italic 19px Georgia,serif;color:#b1a581}.invitation-contact{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:27px}.invitation-contact a{display:inline-flex;align-items:center;justify-content:center;gap:7px;text-decoration:none;font-size:10px;padding:11px 12px;border:1px solid #e4e6d9;border-radius:4px;color:#7c876a}.invitation-calendar{background:#f1f0e8;border-top:1px solid #e9e6da;border-bottom:1px solid #e9e6da}.invitation-calendar h2{margin-bottom:15px}.invitation-date-line{font-size:12px;line-height:1.9;margin:0 0 29px}.invitation-month{max-width:292px;margin:0 auto 28px;padding:23px 14px;border-top:1px solid #dcdccc;border-bottom:1px solid #dcdccc}.invitation-month>strong{font:21px Georgia,serif;letter-spacing:2px;font-weight:400}.invitation-calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:9px 2px;margin-top:24px;align-items:center}.invitation-calendar-grid>span{display:grid;place-items:center;min-width:0;width:30px;height:30px;justify-self:center;font-size:12px;color:#707b62}.invitation-calendar-grid>.invitation-weekday{font-size:10px;color:#8c927d;margin-bottom:6px}.invitation-calendar-grid>.sunday{color:#b28e7b}.invitation-calendar-grid>.wedding-date{border-radius:50%;background:#7e8e6b;color:#fff;box-shadow:0 0 0 3px #7e8e6b12}.invitation-button{display:inline-flex;justify-content:center;align-items:center;gap:9px;padding:13px 20px;border:1px solid #d9decb;border-radius:4px;background:#fcfcf6;color:#6d7d59;font-size:11px;line-height:1.5}.invitation-gallery{padding-left:19px;padding-right:19px}.invitation-gallery h2{font-size:21px;letter-spacing:1px}.invitation-photo-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}.invitation-photo-grid button{border:0;padding:0;aspect-ratio:3/4;overflow:hidden;background:#e9e5d9}.invitation-photo-grid img{display:block;width:100%;height:100%;object-fit:cover;transition:transform .25s}.invitation-photo-grid button:hover img{transform:scale(1.04)}.invitation-photo-credit{margin:14px 0 0;color:#969a87;font-size:9px;text-align:right}.invitation-location{background:#f7f5ed;padding-bottom:50px}.invitation-location h2{margin-bottom:28px}.invitation-location-pin{color:#a2ac8d;margin:0 auto 14px}.invitation-location h3{margin:0 0 7px;font-size:18px;font-weight:400;letter-spacing:1px}.invitation-hall{font-size:13px;margin:0 0 18px}.invitation-location address{font-style:normal;font-size:12px;line-height:1.9;color:#828775}.invitation-venue-phone{display:inline-flex;align-items:center;gap:7px;margin:15px 0 25px;font-size:11px;text-decoration:none;color:#879174!important}.invitation-map-card{height:180px;position:relative;border:1px solid #e0e4d5;border-radius:5px;background:repeating-linear-gradient(0deg,transparent,transparent 49px,#e8eadf 50px),repeating-linear-gradient(90deg,#ecede1,#ecede1 69px,#e1e5d5 70px);overflow:hidden}.invitation-map-road{position:absolute;background:#fcfaf2;box-shadow:0 0 0 1px #dedfce}.invitation-map-road.road-horizontal{height:33px;top:98px;left:0;right:0}.invitation-map-road.road-vertical{width:30px;top:0;bottom:0;left:70px}.invitation-map-station{position:absolute;left:11px;top:144px;padding:5px 7px;background:#e5e9d7;color:#7a885f;font-size:9px;border-radius:4px}.invitation-map-cross{position:absolute;left:102px;top:108px;font-size:8px;color:#9c9d8d}.invitation-map-hall{position:absolute;top:34px;left:53%;display:flex;flex-direction:column;gap:6px;align-items:center;color:#81916a}.invitation-map-hall svg{color:#9eab86;stroke:#f5f5ea}.invitation-map-hall strong{font-size:11px;font-weight:500;color:#697959}.invitation-map-street{position:absolute;right:21px;top:108px;font-size:9px;color:#a3a594;letter-spacing:3px}.invitation-map-caption{font-size:9px;line-height:1.8;color:#959b87;margin:10px 0 16px;word-break:keep-all}.invitation-map-buttons{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px}.invitation-map-buttons a,.invitation-map-buttons button{min-width:0;display:flex;align-items:center;justify-content:center;gap:5px;padding:11px 3px;text-decoration:none;border:1px solid #dce1d0;background:#fcfcf6;border-radius:4px;font-size:10px;white-space:nowrap;color:#6f8059}.invitation-feedback{font-size:10px;min-height:18px;line-height:1.8;color:#7b8967;margin:10px 0 0;overflow-wrap:anywhere}.invitation-transport{text-align:left;margin-top:22px;border-top:1px solid #e3e4d7}.invitation-transport>div{position:relative;padding:24px 0 22px 33px;border-bottom:1px solid #e3e4d7}.invitation-transport>div>svg{position:absolute;left:0;top:24px;color:#98a17f}.invitation-transport h3{font-size:12px;letter-spacing:.5px;margin:0 0 11px}.invitation-transport p{font-size:11px;color:#868b77;line-height:2;white-space:pre-line;overflow-wrap:anywhere;margin:0;word-break:keep-all}.invitation-transport a{display:inline-block;font-size:10px;text-underline-offset:4px;margin-top:10px;color:#7b8965}.invitation-closing{position:relative;overflow:hidden;min-height:280px;text-align:center;padding:65px 25px 49px;background:#e9ecde}.invitation-closing>.invitation-botanical{right:-16px;bottom:10px;width:150px;height:150px;opacity:.55}.invitation-closing>svg:not(.invitation-botanical){color:#8b9876}.invitation-closing p{position:relative;font-family:'Noto Serif KR','Batang',Georgia,serif;font-size:14px;line-height:2.1;color:#7a8569;margin:20px 0}.invitation-closing strong{position:relative;font-size:14px;font-weight:400;letter-spacing:2px;color:#627452}.invitation-days{display:block;position:relative;font-size:10px;color:#8b947b;margin-top:22px}.invitation-share{text-align:center;padding:31px 25px 6px}.invitation-share .invitation-button{width:100%;max-width:300px}.invitation-footer{display:flex;flex-direction:column;align-items:center;gap:18px;margin:0;padding:23px 20px 30px;border:none;font-size:8px;letter-spacing:2px;color:#a0a58e}.invitation-footer>span{display:block}.invitation-footer>button{font-size:9px;letter-spacing:0;color:#9a9f8d;text-decoration:underline;text-underline-offset:4px}.invitation-lightbox{position:fixed;inset:0;max-width:none;max-height:none;width:100%;height:100%;margin:0;padding:0;border:0;background:#182016f5;color:#fff;overflow:hidden}.invitation-lightbox[open]{display:flex;flex-direction:column}.invitation-lightbox::backdrop{background:#182016}.invitation-lightbox-bar{display:flex;justify-content:space-between;align-items:center;padding:19px 20px;flex-shrink:0;font-size:12px;color:#d8dece}.invitation-lightbox button{display:flex;align-items:center;justify-content:center;min-width:42px;min-height:42px;padding:7px;color:#eef1e7;border:0;border-radius:5px;background:#ffffff0c}.invitation-lightbox>img{display:block;width:100%;min-height:0;flex:1;object-fit:contain}.invitation-lightbox-bottom{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:17px 20px 23px;flex-shrink:0}.invitation-lightbox-bottom>p{text-align:center;font-size:11px;line-height:1.8;color:#ced7bf;margin:0;max-width:650px;overflow-wrap:anywhere}.invitation-lightbox-bottom>span{width:42px;flex-shrink:0}
+.invitation-page,.invitation-theme-sample {
+  --invite-ink:#4c5946; --invite-soft:#70775f; --invite-muted:#777e67;
+  --invite-heading:#4e5e43; --invite-gold:#93794e; --invite-petal:#c4b493;
+  --invite-page:#eeece5; --invite-paper:#fcfaf5; --invite-alt:#f1f0e8;
+  --invite-location:#f7f5ed; --invite-closing:#e9ecde; --invite-border:#dce0cf;
+  --invite-button:#fcfcf6; --invite-button-ink:#61714e; --invite-accent:#73845f;
+  --invite-on-accent:#fff; --invite-accent-halo:#7e8e6b12; --invite-sunday:#a77360;
+  --invite-botanical:#7c8c65; --invite-focus:#71845d; --invite-shadow:#4c594615;
+  --invite-photo-base:#e5e1d3; --invite-veil:#fcfaf520;
+  --invite-map-grid:#e1e5d5; --invite-map-base:#ecede1; --invite-map-road:#fcfaf2;
+  --invite-map-station:#e5e9d7; --invite-map-label:#747b65;
+  --invite-lightbox:#182016f5; --invite-lightbox-backdrop:#182016;
+  --invite-lightbox-ink:#eef1e7; --invite-lightbox-button:#ffffff0c;
+}
+.invitation-page[data-theme="briller-night"],.invitation-theme-sample[data-theme="briller-night"] {
+  color-scheme:dark;
+  --invite-ink:#e8dfce; --invite-soft:#c2b8a5; --invite-muted:#afa58f;
+  --invite-heading:#f0e5ce; --invite-gold:#d8bd86; --invite-petal:#d8bd86;
+  --invite-page:#111211; --invite-paper:#1c1e1c; --invite-alt:#252620;
+  --invite-location:#20221e; --invite-closing:#2d2e25; --invite-border:#4e4b3c;
+  --invite-button:#2d3027; --invite-button-ink:#e5d4ad; --invite-accent:#d7bd87;
+  --invite-on-accent:#24271e; --invite-accent-halo:#d7bd8714; --invite-sunday:#e0b0a0;
+  --invite-botanical:#b4b08d; --invite-focus:#e3ca93; --invite-shadow:#0007;
+  --invite-photo-base:#2d2d25; --invite-veil:#1c1e1c20;
+  --invite-map-grid:#383c2f; --invite-map-base:#2c3026; --invite-map-road:#20241c;
+  --invite-map-station:#424934; --invite-map-label:#bbb59f;
+  --invite-lightbox:#101210fa; --invite-lightbox-backdrop:#101210;
+  --invite-lightbox-ink:#f0e5ce; --invite-lightbox-button:#d8bd8614;
+}
+.invitation-page{max-width:none;margin:0;padding:0;min-height:100svh;background:var(--invite-page);color:var(--invite-ink);font-family:'Noto Sans KR',sans-serif}
+.invitation-page *{box-sizing:border-box}
+.invitation-paper{max-width:480px;margin:0 auto;background:var(--invite-paper);box-shadow:0 0 70px var(--invite-shadow);overflow:hidden}
+.invitation-page button,.invitation-page a{-webkit-tap-highlight-color:transparent}
+.invitation-page button:focus-visible,.invitation-page a:focus-visible{outline:2px solid var(--invite-focus);outline-offset:4px}
+.invitation-page a{color:inherit}
+.invitation-preview-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 20px;background:var(--invite-closing);color:var(--invite-ink);font-size:11px}
+.invitation-preview-bar button{display:flex;gap:6px;align-items:center;font-size:11px}
+.invitation-cover{position:relative;text-align:center}
+.invitation-cover-top{padding:39px 24px 28px}
+.invitation-cover-top>span{font:9px Georgia,serif;letter-spacing:3.6px;color:var(--invite-muted)}
+.invitation-cover-top>p{display:flex;align-items:center;justify-content:center;gap:21px;margin:19px 0 0;font-size:17px;font-weight:400;letter-spacing:3px}
+.invitation-cover-top>p svg{color:var(--invite-gold);flex-shrink:0}
+.invitation-cover-photo{position:relative;display:block;width:100%;height:410px;padding:0;overflow:hidden;border:0;background:var(--invite-photo-base)}
+.invitation-cover-photo img{width:100%;height:100%;object-fit:cover;object-position:center}
+.invitation-photo-veil{position:absolute;inset:0;background:linear-gradient(180deg,transparent 65%,var(--invite-veil))}
+.invitation-cover-bottom{position:relative;padding:28px 20px 16px;background:var(--invite-paper)}
+.invitation-cover-script{position:relative;font:italic 24px Georgia,serif;color:var(--invite-soft);margin:0 0 22px}
+.invitation-cover h1{position:relative;margin:0 0 22px;font-family:'Noto Serif KR','Batang',Georgia,serif;letter-spacing:4px;font-size:27px;font-weight:400;color:var(--invite-heading);line-height:1.6}
+.invitation-cover-date{position:relative;font-size:12px;line-height:1.9;margin:0 0 6px;letter-spacing:.3px}
+.invitation-cover-venue{position:relative;font-size:12px;line-height:1.9;margin:0;letter-spacing:.3px}
+.invitation-venue-caption{display:block;position:relative;margin-top:13px;font-size:9px;letter-spacing:.7px;color:var(--invite-muted)}
+.invitation-botanical{color:var(--invite-botanical);width:110px;height:110px;position:absolute;pointer-events:none}
+.invitation-cover-bottom>.invitation-botanical{width:135px;height:135px;left:-42px;top:13px;opacity:.7;transform:rotate(-14deg)}
+.invitation-scroll{position:relative;display:inline-flex;align-items:center;justify-content:center;margin-top:23px;width:35px;height:35px;color:var(--invite-soft)}
+.invitation-section{text-align:center;padding:68px 31px;position:relative}
+.invitation-kicker{display:block;font:10px Georgia,serif;letter-spacing:3.5px;color:var(--invite-gold);margin-bottom:20px}
+.invitation-section h2{font-family:'Noto Serif KR','Batang',Georgia,serif;font-weight:400;font-size:23px;line-height:1.85;letter-spacing:2px;margin:0 0 28px;color:var(--invite-heading)}
+.invitation-message{padding-top:70px;padding-bottom:65px}
+.invitation-message>.invitation-botanical{right:-34px;top:65px;width:125px;height:125px;opacity:.55;transform:rotate(165deg)}
+.invitation-greeting{position:relative;white-space:pre-line;overflow-wrap:anywhere;font-family:'Noto Serif KR','Batang',Georgia,serif;font-size:14px;line-height:2.3;color:var(--invite-soft);margin:0 auto;max-width:335px;word-break:keep-all}
+.invitation-signatures{display:flex;align-items:center;justify-content:center;gap:22px;margin-top:35px}
+.invitation-signatures>p{display:flex;align-items:baseline;gap:12px;margin:0}
+.invitation-signatures small{font-size:10px;color:var(--invite-muted)}
+.invitation-signatures strong{font-size:15px;font-weight:400;letter-spacing:2px}
+.invitation-signatures>span{font:italic 19px Georgia,serif;color:var(--invite-gold)}
+.invitation-contact{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:27px}
+.invitation-contact a{display:inline-flex;align-items:center;justify-content:center;gap:7px;text-decoration:none;font-size:10px;padding:11px 12px;border:1px solid var(--invite-border);border-radius:4px;color:var(--invite-soft)}
+.invitation-calendar{background:var(--invite-alt);border-top:1px solid var(--invite-border);border-bottom:1px solid var(--invite-border)}
+.invitation-calendar h2{margin-bottom:15px}
+.invitation-date-line{font-size:12px;line-height:1.9;margin:0 0 29px}
+.invitation-month{max-width:292px;margin:0 auto 28px;padding:23px 14px;border-top:1px solid var(--invite-border);border-bottom:1px solid var(--invite-border)}
+.invitation-month>strong{font:21px Georgia,serif;letter-spacing:2px;font-weight:400}
+.invitation-calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:9px 2px;margin-top:24px;align-items:center}
+.invitation-calendar-grid>span{display:grid;place-items:center;min-width:0;width:30px;height:30px;justify-self:center;font-size:12px;color:var(--invite-ink)}
+.invitation-calendar-grid>.invitation-weekday{font-size:10px;color:var(--invite-muted);margin-bottom:6px}
+.invitation-calendar-grid>.sunday{color:var(--invite-sunday)}
+.invitation-calendar-grid>.wedding-date{border-radius:50%;background:var(--invite-accent);color:var(--invite-on-accent);box-shadow:0 0 0 3px var(--invite-accent-halo)}
+.invitation-button{display:inline-flex;justify-content:center;align-items:center;gap:9px;padding:13px 20px;border:1px solid var(--invite-border);border-radius:4px;background:var(--invite-button);color:var(--invite-button-ink);font-size:11px;line-height:1.5}
+.invitation-gallery{padding-left:19px;padding-right:19px}
+.invitation-gallery h2{font-size:21px;letter-spacing:1px}
+.invitation-photo-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+.invitation-photo-grid button{border:0;padding:0;aspect-ratio:3/4;overflow:hidden;background:var(--invite-photo-base)}
+.invitation-photo-grid img{display:block;width:100%;height:100%;object-fit:cover;transition:transform .25s}
+.invitation-photo-grid button:hover img{transform:scale(1.04)}
+.invitation-photo-credit{margin:14px 0 0;color:var(--invite-muted);font-size:9px;text-align:right}
+.invitation-location{background:var(--invite-location);padding-bottom:50px}
+.invitation-location h2{margin-bottom:28px}
+.invitation-location-pin{color:var(--invite-botanical);margin:0 auto 14px}
+.invitation-location h3{margin:0 0 7px;font-size:18px;font-weight:400;letter-spacing:1px}
+.invitation-hall{font-size:13px;margin:0 0 18px}
+.invitation-location address{font-style:normal;font-size:12px;line-height:1.9;color:var(--invite-soft)}
+.invitation-venue-phone{display:inline-flex;align-items:center;gap:7px;margin:15px 0 25px;font-size:11px;text-decoration:none;color:var(--invite-soft)!important}
+.invitation-map-card{height:180px;position:relative;border:1px solid var(--invite-border);border-radius:5px;background:repeating-linear-gradient(0deg,transparent,transparent 49px,var(--invite-map-grid) 50px),repeating-linear-gradient(90deg,var(--invite-map-base),var(--invite-map-base) 69px,var(--invite-map-grid) 70px);overflow:hidden}
+.invitation-map-road{position:absolute;background:var(--invite-map-road);box-shadow:0 0 0 1px var(--invite-border)}
+.invitation-map-road.road-horizontal{height:33px;top:98px;left:0;right:0}
+.invitation-map-road.road-vertical{width:30px;top:0;bottom:0;left:70px}
+.invitation-map-station{position:absolute;left:11px;top:144px;padding:5px 7px;background:var(--invite-map-station);color:var(--invite-button-ink);font-size:9px;border-radius:4px}
+.invitation-map-cross{position:absolute;left:102px;top:108px;font-size:8px;color:var(--invite-map-label)}
+.invitation-map-hall{position:absolute;top:34px;left:53%;display:flex;flex-direction:column;gap:6px;align-items:center;color:var(--invite-gold)}
+.invitation-map-hall svg{color:var(--invite-gold);stroke:var(--invite-map-road)}
+.invitation-map-hall strong{font-size:11px;font-weight:500;color:var(--invite-heading)}
+.invitation-map-street{position:absolute;right:21px;top:108px;font-size:9px;color:var(--invite-map-label);letter-spacing:3px}
+.invitation-map-caption{font-size:9px;line-height:1.8;color:var(--invite-muted);margin:10px 0 16px;word-break:keep-all}
+.invitation-map-buttons{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px}
+.invitation-map-buttons a,.invitation-map-buttons button{min-width:0;display:flex;align-items:center;justify-content:center;gap:5px;padding:11px 3px;text-decoration:none;border:1px solid var(--invite-border);background:var(--invite-button);border-radius:4px;font-size:10px;white-space:nowrap;color:var(--invite-button-ink)}
+.invitation-feedback{font-size:10px;min-height:18px;line-height:1.8;color:var(--invite-soft);margin:10px 0 0;overflow-wrap:anywhere}
+.invitation-transport{text-align:left;margin-top:22px;border-top:1px solid var(--invite-border)}
+.invitation-transport>div{position:relative;padding:24px 0 22px 33px;border-bottom:1px solid var(--invite-border)}
+.invitation-transport>div>svg{position:absolute;left:0;top:24px;color:var(--invite-botanical)}
+.invitation-transport h3{font-size:12px;letter-spacing:.5px;margin:0 0 11px}
+.invitation-transport p{font-size:11px;color:var(--invite-soft);line-height:2;white-space:pre-line;overflow-wrap:anywhere;margin:0;word-break:keep-all}
+.invitation-transport a{display:inline-block;font-size:10px;text-underline-offset:4px;margin-top:10px;color:var(--invite-button-ink)}
+.invitation-closing{position:relative;overflow:hidden;min-height:280px;text-align:center;padding:65px 25px 49px;background:var(--invite-closing)}
+.invitation-closing>.invitation-botanical{right:-16px;bottom:10px;width:150px;height:150px;opacity:.55}
+.invitation-closing>svg:not(.invitation-botanical){color:var(--invite-botanical)}
+.invitation-closing p{position:relative;font-family:'Noto Serif KR','Batang',Georgia,serif;font-size:14px;line-height:2.1;color:var(--invite-soft);margin:20px 0}
+.invitation-closing strong{position:relative;font-size:14px;font-weight:400;letter-spacing:2px;color:var(--invite-heading)}
+.invitation-days{display:block;position:relative;font-size:10px;color:var(--invite-muted);margin-top:22px}
+.invitation-share{text-align:center;padding:31px 25px 6px}
+.invitation-share .invitation-button{width:100%;max-width:300px}
+.invitation-footer{display:flex;flex-direction:column;align-items:center;gap:18px;margin:0;padding:23px 20px 30px;border:none;font-size:8px;letter-spacing:2px;color:var(--invite-muted)}
+.invitation-footer>span{display:block}
+.invitation-footer>button{font-size:9px;letter-spacing:0;color:var(--invite-muted);text-decoration:underline;text-underline-offset:4px}
+.invitation-lightbox{position:fixed;inset:0;max-width:none;max-height:none;width:100%;height:100%;margin:0;padding:0;border:0;background:var(--invite-lightbox);color:var(--invite-lightbox-ink);overflow:hidden}
+.invitation-lightbox[open]{display:flex;flex-direction:column}
+.invitation-lightbox::backdrop{background:var(--invite-lightbox-backdrop)}
+.invitation-lightbox-bar{display:flex;justify-content:space-between;align-items:center;padding:19px 20px;flex-shrink:0;font-size:12px;color:var(--invite-lightbox-ink)}
+.invitation-lightbox button{display:flex;align-items:center;justify-content:center;min-width:42px;min-height:42px;padding:7px;color:var(--invite-lightbox-ink);border:0;border-radius:5px;background:var(--invite-lightbox-button)}
+.invitation-lightbox>img{display:block;width:100%;min-height:0;flex:1;object-fit:contain}
+.invitation-lightbox-bottom{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:17px 20px 23px;flex-shrink:0}
+.invitation-lightbox-bottom>p{text-align:center;font-size:11px;line-height:1.8;color:var(--invite-lightbox-ink);margin:0;max-width:650px;overflow-wrap:anywhere}
+.invitation-lightbox-bottom>span{width:42px;flex-shrink:0}
+
 .invitation-editor{max-width:1080px;margin:0 auto}.invitation-editor-intro{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding:25px 26px;background:#eeeee2;border:1px solid #e3e3d4;border-radius:9px;margin-bottom:22px}.invitation-editor-intro h2{font-family:'Noto Serif KR','Batang',Georgia,serif;font-size:22px;line-height:1.6;margin:8px 0 11px;font-weight:400;color:#596a4b}.invitation-editor-intro p{font-size:11px;line-height:1.9;margin:0;max-width:620px;color:#7d866f;word-break:keep-all}.invitation-editor-intro .outline-button{flex-shrink:0}.invitation-editor-layout{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:22px;align-items:start}.invitation-editor-form{display:flex;flex-direction:column;gap:20px;min-width:0}.invitation-editor .card{padding:24px}.invitation-editor fieldset{border:0;margin:0;padding:0;min-width:0}.invitation-editor legend{font-size:15px;color:#5c6e4e;padding:0;margin-bottom:5px}.invitation-editor label{display:block;font-size:11px;color:#738163;margin-top:18px}.invitation-editor input,.invitation-editor textarea{font-size:12px;padding:11px 12px;color:#526446;background:#fff;border:1px solid #dce2d0;border-radius:5px;width:100%;margin-top:8px}.invitation-editor textarea{display:block;font-family:inherit;resize:vertical;line-height:1.9;min-height:90px}.invitation-editor textarea:focus{outline:2px solid #a6b793;outline-offset:1px}.invitation-editor-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.invitation-editor-help{font-size:10px;line-height:1.9;color:#879176;margin:12px 0 0;word-break:keep-all}.invitation-editor-static{margin-top:18px;padding:15px 17px;border-radius:5px;background:#f3f4eb;font-size:11px;color:#7c896b;line-height:1.9}.invitation-editor-static strong{font-weight:500;display:block;color:#61764d}.invitation-editor-static p{margin:2px 0}.invitation-editor-cover{margin:17px 0 0;position:relative;border-radius:6px;overflow:hidden;height:190px;background:#ede9dc}.invitation-editor-cover img{width:100%;height:100%;object-fit:cover}.invitation-editor-photo-list{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-top:20px}.invitation-editor-photo{position:relative;min-width:0;border:1px solid #e4e7d9;border-radius:6px;overflow:hidden;background:#fff}.invitation-editor-photo>img{display:block;width:100%;height:132px;object-fit:cover}.invitation-editor-photo>button{position:absolute;right:6px;top:6px;background:#fbfcf3ed;border-radius:50%;color:#7b886c;display:grid;place-items:center;width:29px;height:29px;padding:0}.invitation-editor-photo>label{font-size:9px;margin:0;padding:11px 10px}.invitation-editor-photo input{padding:7px;font-size:10px;margin-top:5px}.invitation-editor-photo input[type=file],.invitation-editor input[type=file]{max-width:100%;font-size:10px;padding:10px;background:#f9faf4}.invitation-editor-photo-actions{padding:0 10px 11px;display:flex;justify-content:space-between;gap:5px}.invitation-editor-photo-actions button{font-size:9px;color:#839370;padding:3px}.invitation-editor-photo-actions button:disabled{opacity:.4}.invitation-editor-notice{padding:13px 16px;border:1px solid #e6dec6;background:#f8f3e6;border-radius:6px;color:#96805c;font-size:11px;line-height:1.9}.invitation-editor-feedback{margin:0;font-size:11px;color:#6d8259;line-height:1.8}.invitation-editor-feedback.error{color:#a26a55}.invitation-editor-save{display:flex;align-items:center;gap:14px;justify-content:space-between;padding:18px 21px;background:#f4f5ec;border:1px solid #e1e5d5;border-radius:7px}.invitation-editor-save p{font-size:10px;line-height:1.8;color:#899277;margin:0}.invitation-editor-save button{flex-shrink:0}.invitation-editor-preview-note{display:flex;align-items:flex-start;gap:12px;background:#f1f3e7;border:1px solid #e2e6d6;border-radius:7px;padding:18px 20px;font-size:11px;color:#7d8a6c;line-height:1.9}.invitation-editor-preview-note svg{flex-shrink:0;margin-top:2px}.invitation-editor-preview-note p{margin:0}.invitation-editor-preview-note strong{font-weight:500;color:#61764f}.invitation-editor-preview-dialog{position:fixed;width:min(100%,500px);height:92svh;max-height:92svh;max-width:calc(100% - 20px);padding:0;border:0;border-radius:11px;background:#fcfaf5;overflow:auto}.invitation-editor-preview-dialog::backdrop{background:#28352399;backdrop-filter:blur(4px)}.invitation-editor-preview-dialog>.invitation-page{min-height:0}.invitation-editor-preview-dialog .invitation-paper{box-shadow:none}
 @media(min-width:600px){.invitation-page{padding:30px 0}.invitation-paper{border:1px solid #e4e1d6}.invitation-editor-preview-dialog .invitation-page{padding:0}.invitation-editor-preview-dialog .invitation-paper{border:0}.invitation-editor-preview-dialog .invitation-preview-bar{position:sticky;top:0;z-index:10}}@media(max-width:1100px){.invitation-editor-layout{grid-template-columns:1fr}.invitation-editor-intro{flex-wrap:wrap}.invitation-editor-intro .outline-button{margin-top:0}.invitation-editor-photos{display:grid;grid-template-columns:1fr 1fr;gap:20px}.invitation-editor-photos>.invitation-editor-preview-note{grid-column:1/-1}}@media(max-width:600px){.invitation-editor-photos{display:flex;flex-direction:column}.invitation-editor .card{padding:20px}.invitation-editor-intro{padding:21px}.invitation-editor-intro h2{font-size:20px}.invitation-editor-grid{gap:11px}.invitation-editor-save{flex-wrap:wrap;gap:12px}.invitation-editor-save button{width:100%}.invitation-editor-preview-dialog{max-width:100%;width:100%;height:100svh;max-height:100svh;border-radius:0;margin:0}.invitation-editor-preview-dialog .invitation-preview-bar{position:sticky;top:0;z-index:10}.invitation-editor-preview-dialog .invitation-cover-photo{height:370px}}@media(max-width:380px){.invitation-cover-photo{height:350px}.invitation-cover-top{padding-top:31px;padding-bottom:24px}.invitation-cover-top>p{font-size:16px;gap:15px;letter-spacing:2px}.invitation-cover h1{font-size:25px;letter-spacing:3px}.invitation-cover-script{font-size:22px}.invitation-cover-date{font-size:11px}.invitation-section{padding:55px 23px}.invitation-gallery{padding-left:16px;padding-right:16px}.invitation-section h2{font-size:21px}.invitation-signatures{gap:13px}.invitation-signatures>p{gap:8px}.invitation-signatures strong{font-size:14px}.invitation-greeting{font-size:13px}.invitation-map-buttons{gap:4px}.invitation-map-buttons a,.invitation-map-buttons button{font-size:9px;gap:3px}.invitation-map-caption{font-size:8px}.invitation-editor-grid{grid-template-columns:1fr}.invitation-editor-photo-list{gap:9px}.invitation-editor-photo>img{height:115px}}
 
 .invitation-editor-default-photos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin-top:20px}.invitation-editor-default-photos img{display:block;width:100%;height:105px;object-fit:cover;border-radius:4px}.invitation-editor label>svg{vertical-align:middle;margin-right:5px}
+
+/* Shared invitation typography and story chapters. */
+.invitation-cover-top>p{flex-wrap:wrap;overflow-wrap:anywhere}
+.invitation-signatures{flex-wrap:wrap}
+.invitation-signatures>p{min-width:0}
+.invitation-signatures strong,.invitation-closing strong{overflow-wrap:anywhere}
+.invitation-closing strong{display:block}
+.invitation-paper{border-color:var(--invite-border)}
+.invitation-page[data-theme="briller-night"] .invitation-cover-top>span{color:var(--invite-gold)}
+.invitation-page[data-theme="briller-night"] .invitation-cover-top{background:linear-gradient(180deg,#d8bd8608,transparent)}
+.invitation-page[data-theme="briller-night"] .invitation-cover-script{color:var(--invite-gold)}
+.invitation-page[data-theme="briller-night"] .invitation-cover-photo{box-shadow:0 1px 0 var(--invite-border)}
+.invitation-page[data-theme="briller-night"] .invitation-photo-grid button{border:1px solid var(--invite-border)}
+.invitation-story{padding-top:5px;padding-bottom:65px}
+.invitation-story h2{margin-bottom:16px}
+.invitation-story-intro{display:flex;align-items:center;justify-content:center;gap:15px;color:var(--invite-gold);margin-bottom:34px}
+.invitation-story-intro>span{width:31px;height:1px;background:var(--invite-border)}
+.invitation-story-chapters{display:flex;flex-direction:column;gap:34px}
+.invitation-story-chapter{max-width:340px;width:100%;margin:0 auto;position:relative}
+.invitation-story-number{font:italic 12px Georgia,serif;letter-spacing:1px;display:block;color:var(--invite-gold);margin-bottom:14px}
+.invitation-story-chapter h3{font-family:'Noto Serif KR','Batang',Georgia,serif;font-size:16px;line-height:1.7;font-weight:400;letter-spacing:1px;color:var(--invite-heading);margin:0 0 15px}
+.invitation-story-chapter time{display:block;color:var(--invite-gold);font-size:10px;letter-spacing:.7px;line-height:1.9;margin:0 0 15px}
+.invitation-story-chapter p{font-family:'Noto Serif KR','Batang',Georgia,serif;font-size:13px;line-height:2.2;white-space:pre-line;word-break:keep-all;overflow-wrap:anywhere;color:var(--invite-soft);margin:0}
+.invitation-story-chapter+.invitation-story-chapter:before{content:'';display:block;width:1px;height:25px;background:var(--invite-border);margin:0 auto 31px}
+.invitation-story-promise{background:var(--invite-alt);border:1px solid var(--invite-border);padding:27px 23px;border-radius:2px}
+.invitation-story-chapter.invitation-story-promise:before{display:none}
+.invitation-story-promise p{font-size:14px;color:var(--invite-ink)}
+.invitation-editor-preview-dialog[data-theme="briller-night"]{background:#1c1e1c;color:#e8dfce;color-scheme:dark}
+.invitation-editor-preview-dialog[data-theme="briller-night"]::backdrop{background:#111211bb}
+
+/* The editor stays in the planning workspace; each sample shows its invitation palette. */
+.invitation-theme-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:20px}
+.invitation-editor .invitation-theme-choice{position:relative;min-width:0;padding:9px 9px 14px;margin:0;border:1px solid #dce2d0;border-radius:7px;background:#fcfcf7;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+.invitation-editor .invitation-theme-choice.is-selected{border-color:#83986b;box-shadow:0 0 0 1px #83986b}
+.invitation-editor .invitation-theme-choice:focus-within{outline:2px solid #83986b;outline-offset:3px}
+.invitation-editor .invitation-theme-choice>input{position:absolute;z-index:1;right:17px;top:17px;width:15px;height:15px;padding:0;margin:0;accent-color:#6c8156;cursor:pointer}
+.invitation-theme-sample{display:flex;flex-direction:column;align-items:center;min-width:0;overflow:hidden;padding:20px 0 14px;border-radius:3px;background:var(--invite-paper);color:var(--invite-heading);border:1px solid var(--invite-border)}
+.invitation-theme-sample-kicker{font:6px Georgia,serif;letter-spacing:1.7px;color:var(--invite-gold);padding:0 20px}
+.invitation-theme-sample-photo{display:block;width:100%;height:83px;margin:16px 0 16px;overflow:hidden;background:var(--invite-photo-base)}
+.invitation-theme-sample-photo>img{display:block;width:100%;height:100%;object-fit:cover}
+.invitation-theme-sample-title{font:11px/1.8 'Noto Serif KR','Batang',Georgia,serif;letter-spacing:1px;text-align:center;padding:0 4px}
+.invitation-theme-sample-names{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:100%;overflow-wrap:anywhere;text-align:center;padding:0 8px;font-size:8px;line-height:1.9;margin-top:7px;color:var(--invite-soft)}
+.invitation-theme-sample-rule{height:1px;width:25px;background:var(--invite-gold);opacity:.6;margin-top:14px}
+.invitation-theme-choice-title{display:flex;align-items:center;gap:6px;font-size:10px;font-weight:500;color:#5e704f;margin:13px 2px 0;line-height:1.7;word-break:keep-all}
+.invitation-theme-dot{width:8px;height:8px;border-radius:50%;background:#8a9a70;box-shadow:0 0 0 1px #c3c9b5;flex-shrink:0}
+.invitation-theme-choice:has(input[value="briller-night"]) .invitation-theme-dot{background:#303127;box-shadow:0 0 0 2px #cdb582}
+.invitation-theme-choice-description{display:block;font-size:9px;line-height:1.8;margin:5px 2px 0;color:#7b886d;word-break:keep-all}
+.invitation-editor .invitation-story-toggle{display:flex;align-items:flex-start;gap:11px;padding:15px 13px;margin-top:19px;border:1px solid #dce2d0;border-radius:5px;background:#f4f6ec;cursor:pointer;font-size:12px;color:#5c6e4e;line-height:1.6}
+.invitation-editor .invitation-story-toggle>input{flex-shrink:0;width:16px;height:16px;margin:2px 0 0;padding:0;accent-color:#6c8156}
+.invitation-story-toggle small{display:block;font-size:10px;line-height:1.8;font-weight:400;color:#7c896e;margin-top:4px}
+.invitation-editor-story-fields input[type=date]{min-width:0;max-width:100%;box-sizing:border-box}
+.invitation-editor-story-fields textarea{min-height:95px}
+.invitation-editor input:focus-visible{outline:2px solid #a6b793;outline-offset:2px}
+@media(max-width:380px){
+  .invitation-story{padding-top:4px}
+  .invitation-story-chapter p{font-size:12px}
+  .invitation-story-promise{padding:23px 18px}
+  .invitation-theme-choices{gap:10px}
+  .invitation-editor .invitation-theme-choice{padding:7px 7px 12px}
+  .invitation-theme-sample-photo{height:76px}
+  .invitation-theme-choice-title{font-size:9px;gap:5px}
+  .invitation-theme-choice-description{font-size:9px}
+  .invitation-theme-sample-title{font-size:10px;letter-spacing:.4px}
+}
+.invitation-editor-preview-dialog .invitation-paper{overflow:clip}

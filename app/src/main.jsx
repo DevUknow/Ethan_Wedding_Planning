@@ -8,7 +8,7 @@ import HomePlanner from './HomePlanner';
 import HoneymoonPlanner from './HoneymoonPlanner';
 import Invitation from './Invitation';
 import InvitationEditor from './InvitationEditor';
-import {toPublicInvitation,validInvitation} from './invitation-model';
+import {toPublicInvitation,normalizePublicInvitation} from './invitation-model';
 import {budgetSummary} from './budget-model';
 import {VenuePreview,VenueDetails} from './Venue';
 import {venue} from './venue';
@@ -75,9 +75,10 @@ function App(){
    let active=true,revision=-1;setPublicReady(false);setPublicError('');
    const accept=row=>{
      if(!active)return;
-     if(!row||!validInvitation(row.data))throw Error('청첩장 정보를 확인하지 못했습니다. 잠시 후 다시 열어 주세요.');
+     if(!row)throw Error('청첩장 정보를 확인하지 못했습니다. 잠시 후 다시 열어 주세요.');
+     const invitation=normalizePublicInvitation(row.data);
      if(Number(row.revision)<revision)return;
-     revision=Number(row.revision);setPublicInvitation(row.data);setPublicReady(true);setPublicError('');
+     revision=Number(row.revision);setPublicInvitation(invitation);setPublicReady(true);setPublicError('');
    };
    const failed=error=>{if(active)setPublicError(error.message||'청첩장을 불러오지 못했습니다.')};
    if(cloud.error){failed(Error(cloud.error));return()=>{active=false}}

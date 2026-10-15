@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {getInvitation,toPublicInvitation,saveInvitation,validInvitation,validInvitationSettings} from '../app/src/invitation-model.js';
+import {getInvitation,toPublicInvitation,saveInvitation,validInvitation,validInvitationSettings,normalizePublicInvitation} from '../app/src/invitation-model.js';
 
 const privateData = () => ({
   couple:'송윤오 ♥ 박예은',date:'2027-04-17',budget:50000000,
@@ -18,6 +18,8 @@ const settings = () => {
   const {date,...value} = structuredClone(fields);
   return value;
 };
+const blankStory = () => ({enabled:false,firstMetDate:'',firstMetText:'',groomMessage:'',brideMessage:'',promise:''});
+const story = () => ({enabled:true,firstMetDate:'2020-02-29',firstMetText:'처음 만나 함께 걸었던 길',groomMessage:'함께할 매일이 기대돼요.',brideMessage:'서로의 곁을 지켜 줄게요.',promise:'사소한 하루도 함께 아껴 가겠습니다.'});
 
 test('old planning records produce an invitation without mutation or invented photos and time',()=>{
   const data = privateData();
@@ -31,6 +33,8 @@ test('old planning records produce an invitation without mutation or invented ph
   assert.deepEqual(invitation.gallery,[]);
   assert.equal(invitation.contactGroom,'');
   assert.equal(invitation.contactBride,'');
+  assert.equal(invitation.theme,'ivory');
+  assert.deepEqual(invitation.story,blankStory());
   assert.ok(invitation.greeting.length>0);
   assert.equal(validInvitation(invitation),true);
   assert.deepEqual(data,original);
@@ -86,7 +90,7 @@ test('public projection uses explicit top-level and photo allowlists for future 
   const data = privateData();
   data.invitation = {...settings(),budget:'private-settings-token',future:{secret:'private-settings-future-token'},heroPhoto:{...hero,storageSecret:'private-photo-token'},gallery:[{...gallery[0],receipt:'private-gallery-token'}]};
   const output = toPublicInvitation(data);
-  assert.deepEqual(output,fields);
+  assert.deepEqual(output,{...fields,theme:'ivory',story:blankStory()});
   assert.equal(validInvitation(output),true);
   assert.equal(validInvitationSettings(data.invitation),true);
   assert.deepEqual(Object.keys(output.heroPhoto).sort(),['alt','id','url']);
@@ -95,7 +99,7 @@ test('public projection uses explicit top-level and photo allowlists for future 
   assert.equal(serialized.includes('private-'),false);
   for (const key of ['budget','tasks','expenses','guests','saved','home','honeymoon','futurePrivateSection','future','storageSecret','receipt']) assert.equal(Object.hasOwn(output,key),false);
   const saved = saveInvitation(data,{greeting:'안전한 공개 인사말'});
-  assert.equal(Object.hasOwn(saved.invitation,'future'),false);
+  assert.deepEqual(saved.invitation.future,data.invitation.future);
   assert.deepEqual(saved.invitation.heroPhoto,hero);
   assert.deepEqual(saved.invitation.gallery,gallery);
 });
@@ -161,5 +165,77 @@ test('projection suppresses malformed stored values and creates detached photos'
   assert.equal(data.invitation.gallery[0].alt,gallery[0].alt);
   const before = structuredClone(data);
   assert.throws(()=>saveInvitation(data,{time:'24:01'}));
+  assert.deepEqual(data,before);
+});
+
+test('both themes and complete story fields survive editing without changing private records',()=>{
+  const data = privateData();
+  const next = saveInvitation(data,{theme:'briller-night',story:story()});
+  assert.equal(next.invitation.theme,'briller-night');
+  assert.deepEqual(next.invitation.story,story());
+  assert.deepEqual(toPublicInvitation(next).story,story());
+  assert.equal(validInvitation(toPublicInvitation(next)),true);
+  for (const key of ['date','couple','budget','tasks','expenses','guests','home','honeymoon']) assert.equal(next[key],data[key]);
+  const latest = {...next,invitation:{...next.invitation,story:{...next.invitation.story,brideMessage:'최근에 수정한 신부 이야기',futurePrivate:'private-story-token'},futurePrivate:'private-settings-token'}};
+  const edited = saveInvitation(latest,{story:{promise:'약속만 새로 수정합니다.'}});
+  assert.equal(edited.invitation.story.promise,'약속만 새로 수정합니다.');
+  assert.equal(edited.invitation.story.brideMessage,'최근에 수정한 신부 이야기');
+  assert.equal(edited.invitation.story.futurePrivate,'private-story-token');
+  assert.equal(edited.invitation.futurePrivate,'private-settings-token');
+  assert.equal(JSON.stringify(toPublicInvitation(edited)).includes('private-'),false);
+  assert.deepEqual(Object.keys(toPublicInvitation(edited).story).sort(),Object.keys(blankStory()).sort());
+});
+
+test('disabled story drafts remain editable but never appear in the public envelope',()=>{
+  const next = saveInvitation(privateData(),{story:{...story(),enabled:false}});
+  assert.equal(getInvitation(next).story.firstMetText,story().firstMetText);
+  assert.deepEqual(toPublicInvitation(next).story,blankStory());
+  assert.equal(validInvitation(getInvitation(next)),false);
+  assert.equal(validInvitation(toPublicInvitation(next)),true);
+  const reenabled = saveInvitation(next,{story:{enabled:true}});
+  assert.deepEqual(toPublicInvitation(reenabled).story,story());
+  const hidden = saveInvitation(reenabled,{story:{enabled:false}});
+  assert.equal(hidden.invitation.story.firstMetText,story().firstMetText);
+  assert.deepEqual(toPublicInvitation(hidden).story,blankStory());
+});
+
+test('public normalization upgrades legacy envelopes and rejects unknown or unpublished fields',()=>{
+  assert.deepEqual(normalizePublicInvitation(fields),{...fields,theme:'ivory',story:blankStory()});
+  const current = {...fields,theme:'briller-night',story:story()};
+  assert.deepEqual(normalizePublicInvitation(current),current);
+  const detached = normalizePublicInvitation(current);
+  detached.story.promise='공개 사본만 수정';
+  assert.equal(current.story.promise,story().promise);
+  for (const invalid of [
+    {...fields,theme:'ivory'},
+    {...fields,story:blankStory()},
+    {...current,privateToken:'private'},
+    {...current,story:{...story(),privateToken:'private'}},
+    {...current,story:{...story(),enabled:false}},
+  ]) assert.throws(()=>normalizePublicInvitation(invalid));
+});
+
+test('theme and story validation reject malformed input without changing the source document',()=>{
+  const data = saveInvitation(privateData(),{...fields,story:story()});
+  const before = structuredClone(data);
+  for (const theme of ['',null,'night',false,[],{}]) {
+    assert.equal(validInvitationSettings({...settings(),theme}),false);
+    assert.throws(()=>saveInvitation(data,{theme}));
+  }
+  for (const mutation of [
+    {enabled:'true'},{enabled:null},{firstMetDate:'2027-02-29'},{firstMetDate:'2020-2-29'},
+    {firstMetDate:null},{firstMetText:null},{firstMetText:'x'.repeat(1001)},
+    {groomMessage:'x'.repeat(1001)},{brideMessage:5},{promise:[]},
+  ]) {
+    assert.equal(validInvitationSettings({...settings(),story:{...story(),...mutation}}),false);
+    assert.throws(()=>saveInvitation(data,{story:mutation}));
+  }
+  for (const value of [null,false,[],5,'story']) assert.throws(()=>saveInvitation(data,{story:value}));
+  for (const key of Object.keys(story())) {
+    const missing = story();delete missing[key];
+    assert.equal(validInvitationSettings({...settings(),story:missing}),false,key);
+  }
+  assert.equal(validInvitationSettings({...settings(),theme:'ivory',story:{...story(),privateDraft:'kept private'}}),true);
+  assert.deepEqual(getInvitation({...data,invitation:{...data.invitation,theme:'unknown',story:{enabled:'yes',firstMetDate:'not a date',promise:null}}}).story,blankStory());
   assert.deepEqual(data,before);
 });

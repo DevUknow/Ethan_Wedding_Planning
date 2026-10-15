@@ -1,8 +1,13 @@
 // Keep this boundary independent from the planning model: a public invitation
 // must never inherit the private document's budget, guests, notes or records.
 const settingsFields = ['groom','bride','time','greeting','heroPhoto','gallery','directionsNote','contactGroom','contactBride'];
-const publicFields = ['groom','bride','date','time','greeting','heroPhoto','gallery','directionsNote','contactGroom','contactBride'];
+const legacyPublicFields = ['groom','bride','date','time','greeting','heroPhoto','gallery','directionsNote','contactGroom','contactBride'];
+const publicFields = [...legacyPublicFields,'theme','story'];
 const photoFields = ['id','url','alt'];
+const storyFields = ['enabled','firstMetDate','firstMetText','groomMessage','brideMessage','promise'];
+const storyTextFields = ['firstMetText','groomMessage','brideMessage','promise'];
+const emptyStory = () => ({enabled:false,firstMetDate:'',firstMetText:'',groomMessage:'',brideMessage:'',promise:''});
+const theme = value => value === 'ivory' || value === 'briller-night';
 const defaultNames = {groom:'송윤오',bride:'박예은'};
 const defaultGreeting = '서로의 가장 가까운 친구가 되어\n함께 걸어갈 첫날에 초대합니다.\n소중한 걸음으로 자리를 빛내 주세요.';
 const record = value => !!value && typeof value === 'object' && !Array.isArray(value);
@@ -35,6 +40,21 @@ function pickPhoto(value) {
   if (!validPhoto(value)) return null;
   return {id:value.id,url:value.url,alt:value.alt};
 }
+function validStory(value,exact=false) {
+  return (exact ? exactFields(value,storyFields) : hasFields(value,storyFields))
+    && typeof value.enabled === 'boolean' && date(value.firstMetDate)
+    && storyTextFields.every(key => text(value[key],1000));
+}
+function pickStory(value) {
+  return {
+    enabled:value?.enabled === true,
+    firstMetDate:date(value?.firstMetDate) ? value.firstMetDate : '',
+    firstMetText:text(value?.firstMetText,1000) ? value.firstMetText : '',
+    groomMessage:text(value?.groomMessage,1000) ? value.groomMessage : '',
+    brideMessage:text(value?.brideMessage,1000) ? value.brideMessage : '',
+    promise:text(value?.promise,1000) ? value.promise : '',
+  };
+}
 function validSettings(value,exact=false) {
   return hasFields(value,settingsFields) && name(value.groom) && name(value.bride)
     && time(value.time) && text(value.greeting,3000) && text(value.directionsNote,2000)
@@ -42,14 +62,18 @@ function validSettings(value,exact=false) {
     && (value.heroPhoto === null || validPhoto(value.heroPhoto,exact))
     && Array.isArray(value.gallery) && value.gallery.length <= 12
     && value.gallery.every(photo => validPhoto(photo,exact))
-    && new Set(value.gallery.map(photo => photo.id)).size === value.gallery.length;
+    && new Set(value.gallery.map(photo => photo.id)).size === value.gallery.length
+    && (!Object.hasOwn(value,'theme') || theme(value.theme))
+    && (!Object.hasOwn(value,'story') || validStory(value.story,exact));
 }
 
 // Settings are optional in older private backups. When present, all known fields
 // are required; extra private fields remain compatible but are never published.
 export function validInvitationSettings(value) { return validSettings(value); }
 export function validInvitation(value) {
-  return exactFields(value,publicFields) && validSettings(value,true) && date(value.date);
+  return (exactFields(value,legacyPublicFields) || exactFields(value,publicFields))
+    && validSettings(value,true) && date(value.date)
+    && (!Object.hasOwn(value,'story') || value.story.enabled || storyFields.every(key => value.story[key] === emptyStory()[key]));
 }
 function coupleNames(value) {
   if (typeof value !== 'string') return {...defaultNames};
@@ -80,24 +104,43 @@ export function getInvitation(data) {
     directionsNote:text(settings.directionsNote,2000) ? settings.directionsNote : '',
     contactGroom:phone(settings.contactGroom) ? settings.contactGroom : '',
     contactBride:phone(settings.contactBride) ? settings.contactBride : '',
+    theme:theme(settings.theme) ? settings.theme : 'ivory',
+    story:pickStory(settings.story),
   };
 }
 
-export function toPublicInvitation(data) { return getInvitation(data); }
+export function toPublicInvitation(data) {
+  const invitation = getInvitation(data);
+  if (!invitation.story.enabled) invitation.story = emptyStory();
+  return invitation;
+}
+
+// Older deployments publish ten fields. Accept that envelope while always
+// returning the current, explicitly picked shape at the browser boundary.
+export function normalizePublicInvitation(value) {
+  if (!validInvitation(value)) throw Error('청첩장 내용을 불러올 수 없습니다.');
+  return toPublicInvitation({date:value.date,invitation:value});
+}
 
 export function saveInvitation(data,fields) {
   if (!record(fields)) throw Error('청첩장 내용을 확인해 주세요.');
   const current = getInvitation(data);
   const submitted = {};
   for (const key of publicFields) submitted[key] = Object.hasOwn(fields,key) ? fields[key] : current[key];
+  if (Object.hasOwn(fields,'story')) {
+    if (!record(fields.story)) throw Error('우리의 이야기 내용을 확인해 주세요.');
+    submitted.story = {...current.story,...fields.story};
+  }
   for (const key of ['groom','bride','contactGroom','contactBride']) {
     if (typeof submitted[key] === 'string') submitted[key] = submitted[key].trim();
   }
   if (!validSettings(submitted) || !date(submitted.date)) {
     throw Error('이름과 예식 날짜·시간, 연락처, 사진 주소를 확인해 주세요.');
   }
-  const invitation = {};
+  const invitation = record(data?.invitation) ? {...data.invitation} : {};
   for (const key of settingsFields) invitation[key] = submitted[key];
+  invitation.theme = submitted.theme;
+  invitation.story = {...(record(data?.invitation?.story) ? data.invitation.story : {}),...pickStory(submitted.story)};
   invitation.heroPhoto = pickPhoto(submitted.heroPhoto);
   invitation.gallery = submitted.gallery.map(pickPhoto);
   // Apply against the latest document; unrelated records and any concurrent

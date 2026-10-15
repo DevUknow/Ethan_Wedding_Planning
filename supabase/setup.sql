@@ -68,6 +68,22 @@ language sql immutable set search_path = '' as $$
 $$;
 revoke all on function private.valid_invitation_photo(jsonb) from public, anon, authenticated;
 
+create or replace function private.valid_invitation_story(_story jsonb) returns boolean
+language sql immutable set search_path = '' as $$
+  select coalesce(
+    jsonb_typeof(_story)='object'
+    and jsonb_typeof(_story->'enabled')='boolean'
+    and jsonb_typeof(_story->'firstMetDate')='string'
+    and private.valid_invitation_date(_story->>'firstMetDate')
+    and jsonb_typeof(_story->'firstMetText')='string' and length(_story->>'firstMetText')<=1000
+    and jsonb_typeof(_story->'groomMessage')='string' and length(_story->>'groomMessage')<=1000
+    and jsonb_typeof(_story->'brideMessage')='string' and length(_story->>'brideMessage')<=1000
+    and jsonb_typeof(_story->'promise')='string' and length(_story->>'promise')<=1000,
+    false
+  );
+$$;
+revoke all on function private.valid_invitation_story(jsonb) from public, anon, authenticated;
+
 create or replace function private.valid_invitation_settings(_invitation jsonb) returns boolean
 language plpgsql immutable set search_path = '' as $$
 declare _photo jsonb;
@@ -94,6 +110,8 @@ begin
     or jsonb_typeof(_invitation->'gallery') is distinct from 'array'
     or not (_invitation ? 'heroPhoto')
   then return false; end if;
+  if _invitation ? 'theme' and (jsonb_typeof(_invitation->'theme') is distinct from 'string' or (_invitation->>'theme') not in ('ivory','briller-night')) then return false; end if;
+  if _invitation ? 'story' and not private.valid_invitation_story(_invitation->'story') then return false; end if;
   if _invitation->'heroPhoto'<>'null'::jsonb and not private.valid_invitation_photo(_invitation->'heroPhoto') then return false; end if;
   if jsonb_array_length(_invitation->'gallery')>12 then return false; end if;
   for _photo in select value from jsonb_array_elements(_invitation->'gallery') loop
@@ -114,6 +132,7 @@ declare
   _bride text := '박예은';
   _hero jsonb := 'null'::jsonb;
   _gallery jsonb := '[]'::jsonb;
+  _story jsonb := jsonb_build_object('enabled',false,'firstMetDate','','firstMetText','','groomMessage','','brideMessage','','promise','');
 begin
   if cardinality(_names)=2 and length(btrim(_names[1])) between 1 and 40 and length(btrim(_names[2])) between 1 and 40 then
     _groom:=btrim(_names[1]); _bride:=btrim(_names[2]);
@@ -126,12 +145,24 @@ begin
   end if;
   select coalesce(jsonb_agg(jsonb_build_object('id',value->>'id','url',value->>'url','alt',value->>'alt') order by ordinality),'[]'::jsonb)
     into _gallery from jsonb_array_elements(_invitation->'gallery') with ordinality;
+  -- Hidden story drafts stay in wedding_state. Even a guest who inspects the
+  -- raw public API response must not receive the unpublished text or date.
+  if _invitation->'story'->'enabled'='true'::jsonb then
+    _story:=jsonb_build_object(
+      'enabled',true,'firstMetDate',_invitation->'story'->>'firstMetDate',
+      'firstMetText',_invitation->'story'->>'firstMetText',
+      'groomMessage',_invitation->'story'->>'groomMessage',
+      'brideMessage',_invitation->'story'->>'brideMessage',
+      'promise',_invitation->'story'->>'promise'
+    );
+  end if;
   return jsonb_build_object(
     'groom',_invitation->>'groom','bride',_invitation->>'bride',
     'date',case when private.valid_invitation_date(coalesce(_data->>'date','')) then coalesce(_data->>'date','') else '' end,
     'time',_invitation->>'time','greeting',_invitation->>'greeting',
     'heroPhoto',_hero,'gallery',_gallery,'directionsNote',_invitation->>'directionsNote',
-    'contactGroom',_invitation->>'contactGroom','contactBride',_invitation->>'contactBride'
+    'contactGroom',_invitation->>'contactGroom','contactBride',_invitation->>'contactBride',
+    'theme',coalesce(_invitation->>'theme','ivory'),'story',_story
   );
 end;
 $$;
@@ -193,9 +224,10 @@ revoke all on function public.save_wedding_state(bigint,jsonb) from public, anon
 grant execute on function public.save_wedding_state(bigint,jsonb) to authenticated;
 
 -- Seed the public invitation without copying any private planner fields.
-insert into public.wedding_invitation(id,data,revision,updated_at)
+insert into public.wedding_invitation as published(id,data,revision,updated_at)
   select id,private.invitation_projection(data),revision,updated_at from public.wedding_state where id='main'
-  on conflict (id) do update set data=excluded.data,revision=excluded.revision,updated_at=excluded.updated_at;
+  on conflict (id) do update set data=excluded.data,revision=excluded.revision,updated_at=excluded.updated_at
+    where published.revision<=excluded.revision;
 
 do $$ begin
   if exists(select 1 from pg_publication where pubname='supabase_realtime') and not exists(

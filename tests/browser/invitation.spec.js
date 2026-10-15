@@ -48,3 +48,65 @@ test('invitation and editor fit mobile screens and photos stay visible',async({p
   for(const width of [1024,768,390,320]) {await page.setViewportSize({width,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)}
   await page.setViewportSize({width:390,height:844});await page.screenshot({path:'/tmp/our-chapter-invitation-editor-mobile.png',fullPage:true,animations:'disabled'});await page.getByRole('button',{name:'청첩장 미리보기',exact:true}).click();const dialog=page.getByRole('dialog',{name:'모바일 청첩장 미리보기'});const box=await dialog.boundingBox();expect(box.x).toBeGreaterThanOrEqual(0);expect(box.width).toBeLessThanOrEqual(390);await page.keyboard.press('Escape');await expect(dialog).toHaveCount(0);
 });
+
+test('theme and optional story publish only after saving, survive reload and can be hidden without losing the draft',async({page,context})=>{
+  const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  await enterAdmin(page);
+  await expect(page.getByRole('radio',{name:'아이보리 · 올리브'})).toBeChecked();
+  const storyToggle=page.getByRole('checkbox',{name:/우리의 이야기 공개/});await expect(storyToggle).not.toBeChecked();
+  await page.getByRole('radio',{name:'블랙 · 샴페인 골드'}).check();await storyToggle.check();
+  await page.getByLabel('처음 만난 날',{exact:true}).fill('2020-11-03');
+  await page.getByRole('textbox',{name:'첫 만남 이야기',exact:true}).fill('우연히 함께 걷던 가을날,\n우리의 이야기가 시작되었습니다.');
+  await page.getByRole('textbox',{name:'신랑이 전하는 말',exact:true}).fill('함께하는 평범한 하루를 소중히 여길게.');
+  await page.getByRole('textbox',{name:'신부가 전하는 말',exact:true}).fill('서로의 가장 든든한 편이 되어 줄게.');
+  await page.getByRole('textbox',{name:'우리의 약속',exact:true}).fill('많이 웃고, 천천히 듣고, 오래 함께 걷겠습니다.');
+
+  const guest=await context.newPage();await guest.goto('/?invite=1');
+  await expect(guest.locator('.invitation-page')).toHaveAttribute('data-theme','ivory');
+  await expect(guest.getByRole('heading',{name:'우리가 함께 쓴 이야기',exact:true})).toHaveCount(0);
+  await page.getByRole('button',{name:'청첩장 미리보기',exact:true}).click();
+  const preview=page.getByRole('dialog',{name:'모바일 청첩장 미리보기'});
+  await expect(preview.locator('.invitation-page')).toHaveAttribute('data-theme','briller-night');
+  await expect(preview.getByRole('heading',{name:'우리가 함께 쓴 이야기',exact:true})).toBeVisible();
+  await expect(preview).toContainText('우리의 이야기가 시작되었습니다.');await expect(preview).toContainText('서로의 가장 든든한 편이 되어 줄게.');
+  await page.keyboard.press('Escape');
+  await page.getByRole('button',{name:'청첩장 저장',exact:true}).click();await expect(page.getByRole('status')).toContainText('청첩장을 저장했어요');
+  const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('our-chapter-v1')));
+  expect(saved.invitation.theme).toBe('briller-night');expect(saved.invitation.story).toEqual({enabled:true,firstMetDate:'2020-11-03',firstMetText:'우연히 함께 걷던 가을날,\n우리의 이야기가 시작되었습니다.',groomMessage:'함께하는 평범한 하루를 소중히 여길게.',brideMessage:'서로의 가장 든든한 편이 되어 줄게.',promise:'많이 웃고, 천천히 듣고, 오래 함께 걷겠습니다.'});
+  await page.reload();await page.getByRole('button',{name:'모바일 청첩장',exact:true}).click();
+  await expect(page.getByRole('radio',{name:'블랙 · 샴페인 골드'})).toBeChecked();await expect(page.getByLabel('처음 만난 날',{exact:true})).toHaveValue('2020-11-03');await expect(page.getByRole('textbox',{name:'우리의 약속',exact:true})).toHaveValue(saved.invitation.story.promise);
+  await guest.reload();await expect(guest.locator('.invitation-page')).toHaveAttribute('data-theme','briller-night');
+  const story=guest.getByRole('region',{name:'우리가 함께 쓴 이야기'});await expect(story).toBeVisible();await expect(story).toContainText('2020');await expect(story).toContainText('11');await expect(story).toContainText(saved.invitation.story.firstMetText.split('\n')[0]);
+  for(const heading of ['우리의 첫 만남','신랑이 전하는 말','신부가 전하는 말','우리의 약속']) await expect(story.getByRole('heading',{name:heading,exact:true})).toBeVisible();
+  await expect(guest.getByRole('button',{name:/예산 관리|하객 관리|신혼여행|백업/})).toHaveCount(0);
+
+  await page.getByRole('textbox',{name:'신부가 전하는 말',exact:true}).fill('');await page.getByRole('button',{name:'청첩장 저장',exact:true}).click();await expect(page.getByRole('status')).toContainText('청첩장을 저장했어요');await guest.reload();
+  await expect(guest.getByRole('heading',{name:'신부가 전하는 말',exact:true})).toHaveCount(0);await expect(guest.getByRole('heading',{name:'신랑이 전하는 말',exact:true})).toBeVisible();
+  await page.getByRole('checkbox',{name:/우리의 이야기 공개/}).uncheck();await page.getByRole('button',{name:'청첩장 저장',exact:true}).click();await expect(page.getByRole('status')).toContainText('청첩장을 저장했어요');
+  const hidden=await page.evaluate(()=>JSON.parse(localStorage.getItem('our-chapter-v1')));
+  expect(hidden.invitation.story.enabled).toBe(false);expect(hidden.invitation.story.firstMetText).toBe(saved.invitation.story.firstMetText);expect(hidden.invitation.story.promise).toBe(saved.invitation.story.promise);
+  await page.reload();await page.getByRole('button',{name:'모바일 청첩장',exact:true}).click();await expect(page.getByRole('checkbox',{name:/우리의 이야기 공개/})).not.toBeChecked();await expect(page.getByRole('textbox',{name:'우리의 약속',exact:true})).toHaveValue(saved.invitation.story.promise);
+  await guest.reload();await expect(guest.getByRole('region',{name:'우리가 함께 쓴 이야기'})).toHaveCount(0);await expect(guest.locator('body')).not.toContainText(saved.invitation.story.promise);await expect(guest.locator('.invitation-page')).toHaveAttribute('data-theme','briller-night');
+  await guest.close();expect(errors).toEqual([]);
+});
+
+test('both invitation themes wrap long stories on phones, tablets and desktop',async({page})=>{
+  await enterAdmin(page);await page.getByRole('checkbox',{name:/우리의 이야기 공개/}).check();
+  const longText='서로의소중한하루를기억하며함께걷겠습니다'.repeat(60).slice(0,1000);
+  await page.getByRole('textbox',{name:'첫 만남 이야기',exact:true}).fill(longText);await page.getByRole('textbox',{name:'우리의 약속',exact:true}).fill('서로의 말을 끝까지 듣고 작은 순간을 함께 기뻐하겠습니다.');
+  for(const [theme,label] of [['ivory','아이보리 · 올리브'],['briller-night','블랙 · 샴페인 골드']]) {
+    await page.getByRole('radio',{name:label}).check();
+    for(const width of [1440,768,390,320]) {await page.setViewportSize({width,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)}
+    await page.getByRole('button',{name:'청첩장 미리보기',exact:true}).click();const preview=page.getByRole('dialog',{name:'모바일 청첩장 미리보기'});
+    await expect(preview.locator('.invitation-page')).toHaveAttribute('data-theme',theme);
+    for(const width of [1440,768,390,320]) {
+      await page.setViewportSize({width,height:844});expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+      expect(await preview.evaluate(dialog=>dialog.scrollWidth<=dialog.clientWidth)).toBe(true);
+    }
+    await page.keyboard.press('Escape');await page.getByRole('button',{name:'청첩장 저장',exact:true}).click();await expect(page.getByRole('status')).toContainText('청첩장을 저장했어요');
+    const guest=await page.context().newPage();await guest.goto('/?invite=1');
+    for(const width of [1440,768,390,320]) {await guest.setViewportSize({width,height:844});expect(await guest.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await expect(guest.getByRole('region',{name:'우리가 함께 쓴 이야기'})).toContainText(longText)}
+    await guest.setViewportSize({width:390,height:844});await guest.screenshot({path:`/tmp/our-chapter-invitation-${theme}-story-mobile.png`,fullPage:true,animations:'disabled'});
+    await guest.setViewportSize({width:1440,height:1000});await guest.screenshot({path:`/tmp/our-chapter-invitation-${theme}-story-desktop.png`,fullPage:true,animations:'disabled'});await guest.close();
+  }
+});
